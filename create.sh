@@ -3,6 +3,12 @@ set -e
 
 echo "==================== Start create minecraft server  ===================="
 
+echo -n "Project number: "
+read -r project_num
+
+echo -n "Project id: "
+read -r project_id
+
 echo -n "Server name (Default: ydak): "
 read -r server_name
 
@@ -44,9 +50,6 @@ if [ "$seed" != "" ]; then
 fi
 
 echo "Configuration is OK. The next step is to create a minecraft server."
-
-project_id=$(gcloud projects list --format="json" | jq -r '.[].projectId')
-project_num=$(gcloud projects list --format="json" | jq -r '.[].projectNumber')
 
 # firewall =====================================================================
 echo "Checking Firewall ..."
