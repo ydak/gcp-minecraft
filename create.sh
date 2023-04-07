@@ -12,31 +12,86 @@ read -r project_id
 echo -n "Server name (Default: ydak): "
 read -r server_name
 
-echo -n "Game mode (Default: survival) [survival or creative or adventure]: "
-read -r game_mode
-if [ "$game_mode" != "" ] && [ "$game_mode" != "survival" ] && [ "$game_mode" != "creative" ] && [ "$game_mode" != "adventure" ]; then
-  echo "Enter correct game mode [survival] or [creative] or [adventure]."
+# GAME MODE ==========
+cat << EOS
+[GAME MODE]
+1. survival (サバイバル)
+2. creative (クリエイティブ)
+3. adventure (アドベンチャー)
+EOS
+echo -n "Select game mode (Default: survival): "
+read -r game_mode_num
+if [ "$game_mode_num" != "" ] && [ "$game_mode_num" != "1" ] && [ "$game_mode_num" != "2" ] && [ "$game_mode_num" != "3" ]; then
+  echo "[ERROR] Enter correct number 1 or 2 or 3."
   exit 1
 fi
-
-echo -n "Difficulty (Default: normal) [peaceful or easy or normal or hard]: "
-read -r difficulty
-if [ "$difficulty" != "" ] && [ "$difficulty" != "peaceful" ] && [ "$difficulty" != "easy" ] && [ "$difficulty" != "normal" ] && [ "$difficulty" != "hard" ]; then
-  echo "Enter correct game mode [peaceful] or [easy] or [normal] or [hard]."
-  exit 1
+if [ "$game_mode_num" == "1" ]; then
+  game_mode=survival
+fi
+if [ "$game_mode_num" == "2" ]; then
+  game_mode=creative
+fi
+if [ "$game_mode_num" == "3" ]; then
+  game_mode=adventure
 fi
 
-echo -n "Allow cheat? (Default: false) [true or false]: "
-read -r allow_cheat
-if [ "$allow_cheat" != "" ] && [ "$allow_cheat" != "true" ] && [ "$allow_cheat" != "false" ]; then
-  echo "Enter allow cheat [true] or [false]"
+# DIFFICULTY ==========
+cat << EOS
+[DIFFICULTY]
+1. peaceful (平和)
+2. easy (簡単)
+3. normal (普通)
+4. hard (難しい)
+EOS
+echo -n "Difficulty (Default: normal): "
+read -r difficulty_num
+if [ "$difficulty_num" != "" ] && [ "$difficulty_num" != "1" ] && [ "$difficulty_num" != "2" ] && [ "$difficulty_num" != "3" ] && [ "$difficulty_num" != "4" ]; then
+  echo "[ERROR] Enter correct number 1 or 2 or 3 or 4."
   exit 1
 fi
+if [ "$difficulty_num" == "1" ]; then
+  difficulty=peaceful
+fi
+if [ "$difficulty_num" == "2" ]; then
+  difficulty=easy
+fi
+if [ "$difficulty_num" == "3" ]; then
+  difficulty=normal
+fi
+if [ "$difficulty_num" == "4" ]; then
+  difficulty=hard
+fi
 
-echo -n "Default member permission (Default: member) [visitor or member or operator]: "
-read -r permission
-if [ "$permission" != "" ] && [ "$permission" != "visitor" ] && [ "$permission" != "member" ] && [ "$permission" != "operator" ]; then
-  echo "Enter correct permission [visitor] or [member] or [operator]"
+# ALLOW CHEAT ==========
+cat << EOS
+[ALLOW CHEAT]
+1. yes (有効)
+2. no (無効)
+EOS
+echo -n "Allow cheat? (Default: no): "
+read -r allow_cheat_num
+if [ "$allow_cheat_num" != "" ] && [ "$allow_cheat_num" != "1" ] && [ "$allow_cheat_num" != "2" ]; then
+  echo "[ERROR] Enter correct number 1 or 2"
+  exit 1
+fi
+if [ "$allow_cheat_num" == "1" ]; then
+  allow_cheat=true
+fi
+if [ "$allow_cheat_num" == "2" ]; then
+  allow_cheat=false
+fi
+
+# ALLOW CHEAT ==========
+cat << EOS
+[ALLOW CHEAT]
+1. visitor (訪問者)
+2. member (メンバー)
+3. operator (管理者)
+EOS
+echo -n "Default permission (Default: member): "
+read -r permission_num
+if [ "$permission_num" != "" ] && [ "$permission_num" != "1" ] && [ "$permission_num" != "2" ] && [ "$permission_num" != "3" ]; then
+  echo "[ERROR] Enter correct number 1 or 2 or 3"
   exit 1
 fi
 
@@ -44,7 +99,7 @@ echo -n "Seed (Default: random): "
 read -r seed
 if [ "$seed" != "" ]; then
   if [[ ! ("$seed" =~ ^[-0-9][0-9]+$) ]]; then
-    echo "Enter correct number for seed."
+    echo "[ERROR] Enter correct number for seed."
     exit 1
   fi
 fi
