@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 set -e
 
+script_dir=$(dirname ${0})
+. $script_dir/functions.sh
+. $script_dir/const.sh
+
 echo "==================== Start create minecraft server  ===================="
 
+# SEED ==========
+cat <<EOS
+-*-*-*-*- [GOOGLE CLOUD INFORMATION (アカウント情報入力)] -*-*-*-*-
+EOS
 echo -n "Project number: "
 read -r project_num
 
@@ -12,39 +20,72 @@ read -r project_id
 echo -n "Server name (Default: ydak): "
 read -r server_name
 
-echo -n "Game mode (Default: survival) [survival or creative or adventure]: "
-read -r game_mode
-if [ "$game_mode" != "" ] && [ "$game_mode" != "survival" ] && [ "$game_mode" != "creative" ] && [ "$game_mode" != "adventure" ]; then
-  echo "Enter correct game mode [survival] or [creative] or [adventure]."
-  exit 1
-fi
+# GAME MODE ==========
+cat <<EOS
 
-echo -n "Difficulty (Default: normal) [peaceful or easy or normal or hard]: "
-read -r difficulty
-if [ "$difficulty" != "" ] && [ "$difficulty" != "peaceful" ] && [ "$difficulty" != "easy" ] && [ "$difficulty" != "normal" ] && [ "$difficulty" != "hard" ]; then
-  echo "Enter correct game mode [peaceful] or [easy] or [normal] or [hard]."
-  exit 1
-fi
+-*-*-*-*- [GAME MODE (ゲームモード)] -*-*-*-*-
+1. survival (サバイバル)
+2. creative (クリエイティブ)
+3. adventure (アドベンチャー)
+EOS
+echo -n "Select game mode (Default: survival): "
+read -r game_mode_num
+if [ "$game_mode_num" == "" ]; then game_mode_num=1 ; fi
+num_validation $game_mode_num 3
+game_mode=${game_mode_list[$game_mode_num-1]}
 
-echo -n "Allow cheat? (Default: false) [true or false]: "
-read -r allow_cheat
-if [ "$allow_cheat" != "" ] && [ "$allow_cheat" != "true" ] && [ "$allow_cheat" != "false" ]; then
-  echo "Enter allow cheat [true] or [false]"
-  exit 1
-fi
+# DIFFICULTY ==========
+cat <<EOS
 
-echo -n "Default member permission (Default: member) [visitor or member or operator]: "
-read -r permission
-if [ "$permission" != "" ] && [ "$permission" != "visitor" ] && [ "$permission" != "member" ] && [ "$permission" != "operator" ]; then
-  echo "Enter correct permission [visitor] or [member] or [operator]"
-  exit 1
-fi
+-*-*-*-*- [DIFFICULTY (難易度)] -*-*-*-*-
+1. peaceful (ピースフル)
+2. easy (イージー)
+3. normal (ノーマル)
+4. hard (ハード)
+EOS
+echo -n "Difficulty (Default: normal): "
+read -r difficulty_num
+if [ "$difficulty_num" == "" ]; then difficulty_num=3 ; fi
+num_validation $difficulty_num 4
+difficulty=${difficulty_list[$difficulty_num-1]}
 
+# CHEAT ==========
+cat <<EOS
+
+-*-*-*-*- [CHEAT (チート)] -*-*-*-*-
+1. ON (有効)
+2. OFF (無効)
+EOS
+echo -n "Allow cheat? (Default: OFF): "
+read -r allow_cheat_num
+if [ "$allow_cheat_num" == "" ]; then allow_cheat_num=2 ; fi
+num_validation $allow_cheat_num 2
+allow_cheat=${allow_cheat_list[$allow_cheat_num-1]}
+
+# PERMISSION ==========
+cat <<EOS
+
+-*-*-*-*- [PERMISSION (権限)] -*-*-*-*-
+1. visitor (訪問者)
+2. member (メンバー)
+3. operator (管理者)
+EOS
+echo -n "Default permission (Default: member): "
+read -r permission_num
+if [ "$permission_num" == "" ]; then permission_num=2 ; fi
+num_validation $permission_num 3
+permission=${permission_num_list[$permission_num-1]}
+
+# SEED ==========
+cat <<EOS
+
+-*-*-*-*- [SEED (シード値)] -*-*-*-*-
+EOS
 echo -n "Seed (Default: random): "
 read -r seed
 if [ "$seed" != "" ]; then
   if [[ ! ("$seed" =~ ^[-0-9][0-9]+$) ]]; then
-    echo "Enter correct number for seed."
+    echo "[ERROR] Enter correct number for seed."
     exit 1
   fi
 fi
@@ -97,10 +138,19 @@ docker volume create mc-volume && \
 docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=${server_name:-ydak} -e GAMEMODE=${game_mode:-survival} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e LEVEL_SEED=$seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
 " | jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP')
 
-echo "All Done!! Wait for 3 minutes and access the minecraft!"
-echo ""
-echo "##########################################################################"
-echo "You can access Minecraft using the [$external_ip] server IP address."
-echo "##########################################################################"
-echo ""
+cat
+
+cat <<EOS
+
+All Done!!
+
+Wait for a minute and access the minecraft!
+
+You can access Minecraft using the following IP address!
+
+################################################################################
+${external_ip}
+################################################################################
+
+EOS
 echo "==================== End create minecraft server  ===================="
