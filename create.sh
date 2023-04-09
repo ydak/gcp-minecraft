@@ -7,25 +7,37 @@ script_dir=$(dirname ${0})
 
 echo "==================== Start create minecraft server  ===================="
 
-# SEED ==========
-cat <<EOS
--*-*-*-*- [GOOGLE CLOUD INFORMATION (アカウント情報入力)] -*-*-*-*-
-EOS
-echo -n "Project number: "
-read -r project_num
-
-echo -n "Project id: "
-read -r project_id
-
+# GOOGLE CLOUD ==========
+echo -n "Setting Google Cloud info ..."
+project_id=$(gcloud config get project)
+project_num=$(gcloud projects list --filter="$project_id" --format="value(PROJECT_NUMBER)")
 gcloud config set project $project_id
 
+cat <<EOS
+
+-*-*-*-*- [GOOGLE CLOUD (GoogleCloud の情報確認)] -*-*-*-*-
+Project id     : $project_id
+Project Number : $project_num
+
+以上の情報が正しいことを確認してください。
+EOS
+
+echo -n "Google Cloud info is correct? [y/N]: "
+read -r gcp_info
+if [ "$gcp_info" != "y" ]; then exit 1 ; fi
+
+# SERVER NAME ==========
+cat <<EOS
+
+-*-*-*-*- [SERVER NAME (マインクラフトサーバー名を自由に決めて下さい)] -*-*-*-*-
+EOS
 echo -n "Server name (Default: ydak): "
 read -r server_name
 
 # GAME MODE ==========
 cat <<EOS
 
--*-*-*-*- [GAME MODE (ゲームモード)] -*-*-*-*-
+-*-*-*-*- [GAME MODE (ゲームモードを選択)] -*-*-*-*-
 1. survival (サバイバル)
 2. creative (クリエイティブ)
 3. adventure (アドベンチャー)
@@ -39,7 +51,7 @@ game_mode=${game_mode_list[$game_mode_num-1]}
 # DIFFICULTY ==========
 cat <<EOS
 
--*-*-*-*- [DIFFICULTY (難易度)] -*-*-*-*-
+-*-*-*-*- [DIFFICULTY (難易度を選択)] -*-*-*-*-
 1. peaceful (ピースフル)
 2. easy (イージー)
 3. normal (ノーマル)
@@ -54,7 +66,7 @@ difficulty=${difficulty_list[$difficulty_num-1]}
 # CHEAT ==========
 cat <<EOS
 
--*-*-*-*- [CHEAT (チート)] -*-*-*-*-
+-*-*-*-*- [CHEAT (チートを有効にするかどうか)] -*-*-*-*-
 1. ON (有効)
 2. OFF (無効)
 EOS
@@ -67,7 +79,7 @@ allow_cheat=${allow_cheat_list[$allow_cheat_num-1]}
 # PERMISSION ==========
 cat <<EOS
 
--*-*-*-*- [PERMISSION (権限)] -*-*-*-*-
+-*-*-*-*- [PERMISSION (サーバーに参加するユーザー全員の権限)] -*-*-*-*-
 1. visitor (訪問者)
 2. member (メンバー)
 3. operator (管理者)
@@ -81,7 +93,7 @@ permission=${permission_num_list[$permission_num-1]}
 # SEED ==========
 cat <<EOS
 
--*-*-*-*- [SEED (シード値)] -*-*-*-*-
+-*-*-*-*- [SEED (シード値を入力。入力しない場合はランダム)] -*-*-*-*-
 EOS
 echo -n "Seed (Default: random): "
 read -r seed
@@ -152,7 +164,7 @@ Wait for a minute and access the minecraft!
 You can access Minecraft using the following IP address!
 
 ################################################################################
-${external_ip}
+${external_ip} (この IP を使用して作成したマインクラフトにアクセスできます)
 ################################################################################
 
 EOS
