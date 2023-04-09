@@ -17,6 +17,8 @@ read -r project_num
 echo -n "Project id: "
 read -r project_id
 
+gcloud config set project $project_id
+
 echo -n "Server name (Default: ydak): "
 read -r server_name
 
