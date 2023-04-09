@@ -19,10 +19,10 @@ cat <<EOS
 プロジェクト ID  : $project_id
 プロジェクト番号 : $project_num
 
-情報が正しいことを確認してください。
+上記の Google Cloud でマインクラフトサーバーを作成します。
 EOS
 
-echo -n "正しいですか? [y/N]: "
+echo -n "よろしいですか? [y/N]: "
 read -r gcp_info
 if [ "$gcp_info" != "y" ]; then exit 1 ; fi
 
