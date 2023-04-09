@@ -138,8 +138,6 @@ docker volume create mc-volume && \
 docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=${server_name:-ydak} -e GAMEMODE=${game_mode:-survival} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e LEVEL_SEED=$seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
 " | jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP')
 
-cat
-
 cat <<EOS
 
 All Done!!
