@@ -19,7 +19,7 @@ cat <<EOS
 プロジェクト ID  : $project_id
 プロジェクト番号 : $project_num
 
-上記の Google Cloud でマインクラフトサーバーを作成します。
+上記の Google Cloud 環境でマインクラフトサーバーを作成します。
 EOS
 
 echo -n "よろしいですか? [y/N]: "
