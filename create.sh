@@ -38,9 +38,9 @@ read -r server_name
 cat <<EOS
 
 -*-*-*-*- [GAME MODE (ゲームモードを選択)] -*-*-*-*-
-1. survival (サバイバル)
-2. creative (クリエイティブ)
-3. adventure (アドベンチャー)
+[1] survival (サバイバル)
+[2] creative (クリエイティブ)
+[3] adventure (アドベンチャー)
 EOS
 echo -n "Select game mode (Default: survival): "
 read -r game_mode_num
@@ -52,10 +52,10 @@ game_mode=${game_mode_list[$game_mode_num-1]}
 cat <<EOS
 
 -*-*-*-*- [DIFFICULTY (難易度を選択)] -*-*-*-*-
-1. peaceful (ピースフル)
-2. easy (イージー)
-3. normal (ノーマル)
-4. hard (ハード)
+[1] peaceful (ピースフル)
+[2] easy (イージー)
+[3] normal (ノーマル)
+[4] hard (ハード)
 EOS
 echo -n "Difficulty (Default: normal): "
 read -r difficulty_num
@@ -67,8 +67,8 @@ difficulty=${difficulty_list[$difficulty_num-1]}
 cat <<EOS
 
 -*-*-*-*- [CHEAT (チートを有効にするかどうか)] -*-*-*-*-
-1. ON (有効)
-2. OFF (無効)
+[1] ON (有効)
+[2] OFF (無効)
 EOS
 echo -n "Allow cheat? (Default: OFF): "
 read -r allow_cheat_num
@@ -80,9 +80,9 @@ allow_cheat=${allow_cheat_list[$allow_cheat_num-1]}
 cat <<EOS
 
 -*-*-*-*- [PERMISSION (サーバーに参加するユーザー全員の権限)] -*-*-*-*-
-1. visitor (訪問者)
-2. member (メンバー)
-3. operator (管理者)
+[1] visitor (訪問者)
+[2] member (メンバー)
+[3] operator (管理者)
 EOS
 echo -n "Default permission (Default: member): "
 read -r permission_num
