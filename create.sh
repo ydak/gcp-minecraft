@@ -94,6 +94,9 @@ fi
 
 echo "Configuration is OK. The next step is to create a minecraft server."
 
+echo "Enabling compute.googleapis.com ..."
+gcloud services enable compute.googleapis.com
+
 # firewall =====================================================================
 echo "Checking Firewall ..."
 fw_minecraft=$(gcloud compute firewall-rules list --format="json" | jq -r '.[] | select(.name=="minecraft")')
