@@ -18,6 +18,5 @@ Internally, this uses a Docker container.
 1. Execute the following command
 
 ```bash
-git clone https://github.com/ydak/gcp-minecraft.git && \
-  ./gcp-minecraft/create.sh
+git clone https://github.com/ydak/gcp-minecraft.git ; ./gcp-minecraft/create.sh
 ```

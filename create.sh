@@ -15,14 +15,14 @@ gcloud config set project $project_id
 
 cat <<EOS
 
--*-*-*-*- [GOOGLE CLOUD (GoogleCloud の情報確認)] -*-*-*-*-
+-*-*-*-*- [GOOGLE CLOUD (Google Cloud の情報確認)] -*-*-*-*-
 Project id     : $project_id
 Project Number : $project_num
 
 以上の情報が正しいことを確認してください。
 EOS
 
-echo -n "Google Cloud info is correct? [y/N]: "
+echo -n "正しいですか? [y/N]: "
 read -r gcp_info
 if [ "$gcp_info" != "y" ]; then exit 1 ; fi
 
@@ -157,11 +157,11 @@ docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=
 
 cat <<EOS
 
-All Done!!
+All Done!! (すべて完了しました！！)
 
-Wait for a minute and access the minecraft!
+Wait for a minute and access the minecraft! (数分後にマインクラフトへアクセスできます)
 
-You can access Minecraft using the following IP address!
+You can access Minecraft using the following IP address! (下記のIPアドレスを使用してマインクラフトにアクセス可能です！)
 
 ################################################################################
 ${external_ip} (この IP を使用して作成したマインクラフトにアクセスできます)
