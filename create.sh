@@ -16,10 +16,10 @@ gcloud config set project $project_id
 cat <<EOS
 
 -*-*-*-*- [GOOGLE CLOUD (Google Cloud の情報確認)] -*-*-*-*-
-Project id     : $project_id
-Project Number : $project_num
+プロジェクト ID  : $project_id
+プロジェクト番号 : $project_num
 
-以上の情報が正しいことを確認してください。
+情報が正しいことを確認してください。
 EOS
 
 echo -n "正しいですか? [y/N]: "
