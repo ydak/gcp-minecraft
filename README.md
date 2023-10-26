@@ -14,9 +14,20 @@ Internally, this uses a Docker container.
 
 ## Usage
 
+### Create Minecraft server
+
 1. Open CloudShell in Google Cloud
 1. Execute the following command
 
 ```bash
 git clone https://github.com/ydak/gcp-minecraft.git ; ./gcp-minecraft/create.sh
+```
+
+### Update Minecraft server
+
+1. Open CloudShell in Google Cloud
+1. Execute the following command
+
+```bash
+git clone https://github.com/ydak/gcp-minecraft.git ; ./gcp-minecraft/update.sh
 ```
