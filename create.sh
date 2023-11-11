@@ -1,9 +1,32 @@
 #!/usr/bin/env bash
 set -e
 
-script_dir=$(dirname ${0})
-. $script_dir/functions.sh
-. $script_dir/const.sh
+################################################################################
+# Receives a string and check if it is a specified number.
+# If it is not a valid number, exits with error code 1.
+#
+# Arguments:
+#   1: Received input
+#   2: Valid max number
+# Returns:
+#   None
+################################################################################
+function num_validation() {
+  local received=$1
+  local max_num=$2
+
+  if [ "$received" != "" ]; then
+    if [[ ! ("$received" =~ ^[1-$max_num]$) ]]; then
+      echo "[ERROR] Enter valid number. (数字を正しく入力して下さい。)"
+      exit 1
+    fi
+  fi
+}
+
+game_mode_list=(survival creative adventure)
+difficulty_list=(peaceful easy normal hard)
+allow_cheat_list=(true false)
+permission_num_list=(visitor member operator)
 
 echo "==================== Start create minecraft server  ===================="
 
