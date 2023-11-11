@@ -20,6 +20,9 @@ cat <<EOS
 プロジェクト番号 : $project_num
 
 上記の Google Cloud 環境でマインクラフトサーバーを作成します。
+
+・今回作成する Minecraft サーバーの無料枠は、 1 Google Cloud アカウントにつき 1 つまでです。
+・すでに作成済みの場合は 2 台目扱いとなり、無料枠の範囲外になります。(おおよそ毎月700円)
 EOS
 
 echo -n "よろしいですか? [y/N]: "
@@ -164,10 +167,8 @@ All Done!!
  (すべて完了しました！！)
 
 Wait for a minute and access the minecraft!
- (数分後にマインクラフトへアクセスできます)
-
 You can access Minecraft using the following IP address!
-(下記のIPアドレスを使用してマインクラフトにアクセス可能です！)
+(数分後、下記のIPアドレスを使用してあなたのマインクラフトにアクセスしましょう！)
 
 ################################################################################
 ${external_ip}
