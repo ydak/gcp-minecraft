@@ -25,9 +25,20 @@ git clone https://github.com/ydak/gcp-minecraft.git ; ./gcp-minecraft/create.sh
 
 ### Update Minecraft server
 
+If you are unable to play due to a mismatched Minecraft version, run this.
+
 1. Open CloudShell in Google Cloud
 1. Execute the following command
 
 ```bash
-git clone https://github.com/ydak/gcp-minecraft.git ; ./gcp-minecraft/update.sh
+git clone https://github.com/ydak/gcp-minecraft.git ; git -C ./gcp-minecraft pull ; ./gcp-minecraft/update.sh
+```
+
+### Delete Minecraft server
+
+1. Open CloudShell in Google Cloud
+1. Execute the following command
+
+```bash
+git clone https://github.com/ydak/gcp-minecraft.git ; git -C ./gcp-minecraft pull ; ./gcp-minecraft/delete.sh
 ```
