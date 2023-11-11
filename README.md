@@ -16,11 +16,17 @@ Internally, this uses a Docker container.
 
 ※If the following SSH key creation statement appears, enter "Y" to continue.
 
-```shell
+```
 This tool needs to create the directory [/home/<USER_NAME>/.ssh] before being able
  to generate SSH keys.
 
 Do you want to continue (Y/n)?
+```
+
+In the following statement, press Enter without typing anything.
+```
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
 ```
 
 ### Create Minecraft server
