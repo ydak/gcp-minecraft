@@ -47,10 +47,23 @@ if [ ${#backups[@]} -eq 0 ]; then
 [ERROR] No backup was found in $BACKUP_DIR.
         ($BACKUP_DIR にバックアップが見つかりませんでした。)
 
-Take one with backup first, or upload a .tar.gz named
-minecraft-backup-*.tar.gz through the CloudShell editor.
-(先に backup を実行するか、minecraft-backup-*.tar.gz という名前で
- CloudShell にアップロードして下さい。)
+先に backup を実行するか、手元のファイルをアップロードして下さい。
+(Take one with backup first, or upload one from your machine.)
+
+手元のファイルを使う場合:
+(To use a file from your machine:)
+
+  1. CloudShell 右上の [ ⋮ ] から Upload を選ぶ
+     (Click the [ more_vert ] menu in CloudShell and choose Upload)
+  2. ホームディレクトリにアップロードする
+     (Upload it to your home directory)
+  3. 名前を minecraft-backup-*.tar.gz に合わせる
+     (Name it minecraft-backup-*.tar.gz)
+
+手元の PC のターミナルからでも送れます。
+(It can also be pushed from a terminal on your machine.)
+
+  gcloud cloud-shell scp localhost:~/minecraft-backup-YYYYmmdd-HHMMSS.tar.gz cloudshell:~/
 
 EOS
   exit 1
@@ -67,6 +80,14 @@ for b in "${backups[@]}"; do
   echo "[$i] $(basename "$b") ($(du -h "$b" | cut -f1))"
   i=$((i + 1))
 done
+
+cat <<EOS
+
+手元のファイルを使う場合は、CloudShell 右上の [ ⋮ ] から Upload で
+ホームディレクトリへ置き、minecraft-backup-*.tar.gz という名前にして下さい。
+(To use a file from your machine, upload it to your home directory via the
+ [ more_vert ] menu and name it minecraft-backup-*.tar.gz.)
+EOS
 
 echo -n "Select backup (Default: 1): "
 read -r backup_num
