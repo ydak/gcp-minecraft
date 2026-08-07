@@ -14,6 +14,37 @@ Internally, this uses a Docker container.
 
 ## Usage
 
+1. Open CloudShell in Google Cloud
+1. Execute the following command
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ydak/gcp-minecraft/main/mc.sh | bash
+```
+
+1. Select what you want to do from the menu
+
+```
+-*-*-*-*- [ACTION (操作を選択)] -*-*-*-*-
+[1] create (マインクラフトサーバーを作成)
+[2] update (マインクラフトを更新)
+[3] delete (マインクラフトサーバーを削除)
+Select action (Default: 1):
+```
+
+| Action | Description |
+| --- | --- |
+| `create` | Create a Minecraft server. |
+| `update` | Update Minecraft. Run this if you are unable to play due to a mismatched version. |
+| `delete` | Delete the Minecraft server. **The world data is deleted along with it.** |
+
+The action can also be given directly, which skips the menu.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ydak/gcp-minecraft/main/mc.sh | bash -s -- update
+```
+
+## Notes
+
 ※If the following SSH key creation statement appears, enter "Y" to continue.
 
 ```
@@ -27,33 +58,4 @@ In the following statement, press Enter without typing anything.
 ```
 Enter passphrase (empty for no passphrase): 
 Enter same passphrase again: 
-```
-
-### Create Minecraft server
-
-1. Open CloudShell in Google Cloud
-1. Execute the following command
-
-```bash
-rm -rf /tmp/ydak-mc ; git clone https://github.com/ydak/gcp-minecraft /tmp/ydak-mc ; /tmp/ydak-mc/create.sh
-```
-
-### Update Minecraft server
-
-If you are unable to play due to a mismatched Minecraft version, run this.
-
-1. Open CloudShell in Google Cloud
-1. Execute the following command
-
-```bash
-rm -rf /tmp/ydak-mc ; git clone https://github.com/ydak/gcp-minecraft /tmp/ydak-mc ; /tmp/ydak-mc/update.sh
-```
-
-### Delete Minecraft server
-
-1. Open CloudShell in Google Cloud
-1. Execute the following command
-
-```bash
-rm -rf /tmp/ydak-mc ; git clone https://github.com/ydak/gcp-minecraft /tmp/ydak-mc ; /tmp/ydak-mc/delete.sh
 ```
