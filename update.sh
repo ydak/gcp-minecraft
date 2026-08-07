@@ -57,19 +57,40 @@ echo -n "よろしいですか? [y/N]: "
 read -r update_yn
 if [ "$update_yn" != "y" ]; then exit 1 ; fi
 
-echo "Updating minecraft ..."
+# Rebooting is the update mechanism for the whole stack, not just a way to
+# apply an OS update:
+#
+#   - Container-Optimized OS swaps to whatever it staged on its spare partition
+#   - the startup script pulls the wrapper image again and recreates the
+#     container, so its base libraries do not age
+#   - the container fetches the current Bedrock binary as it starts
+#
+# `docker restart` alone would only cover the last of those three, so this
+# always reboots rather than picking the cheaper path.
+#
+# Note that the first two only apply to instances created by a create.sh that
+# writes this startup script. On older instances the reboot still refreshes
+# Bedrock, and nothing breaks.
+echo "Checking for OS updates ..."
+os_status=$(gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" \
+  --command="sudo update_engine_client --status 2>/dev/null | grep CURRENT_OP" 2>/dev/null || true)
 
-# NOTE: The Bedrock server binary is not bundled in the image. It is downloaded
-#       from Mojang at container startup, and VERSION defaults to LATEST, so
-#       restarting the container is what actually performs the upgrade.
-#
-#       `docker pull` is deliberately not used here. A running container stays
-#       bound to the image it was created from, so pulling a newer image has no
-#       effect on it and only piles up unused layers on the 10GB boot disk.
-#
-#       The image handles SIGTERM by sending `stop` to the server, so the world
-#       is saved cleanly before the restart.
-gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="docker restart mc-server"
+if echo "$os_status" | grep -q "UPDATED_NEED_REBOOT"; then
+  echo "  An OS update is staged and will be applied by this reboot."
+  echo "  (OS の更新が準備済みです。この再起動で適用されます。)"
+else
+  echo "  No OS update is staged."
+  echo "  (準備済みの OS 更新はありません。)"
+fi
+
+echo "Rebooting to update ..."
+
+# The image turns SIGTERM into a clean `stop`, but the shutdown sequence is
+# less forgiving than `docker stop`, so stop the container explicitly first.
+# The connection drops as the instance goes down, so ssh reports failure here;
+# wait_for_server below is what actually confirms the outcome.
+gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" \
+  --command="docker stop -t 60 mc-server && sudo reboot" > /dev/null 2>&1 || true
 
 echo ""
 echo "Waiting for the Minecraft server to come back ..."

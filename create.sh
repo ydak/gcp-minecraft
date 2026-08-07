@@ -231,6 +231,44 @@ echo "COS image check complete."
 
 echo "Creating server for minecraft ..."
 
+# The startup script moved out of --metadata and into --metadata-from-file.
+# --metadata takes comma separated key=value pairs, so a single comma anywhere
+# in the script would silently split it into bogus keys. Keeping it in its own
+# file leaves --metadata free for cos-update-strategy.
+startup_script=$(mktemp)
+trap 'rm -f "$startup_script"' EXIT
+
+# This runs on every boot, so it is written to be idempotent and to refresh
+# what it can. A reboot is the single update mechanism for the whole stack:
+#   - Container-Optimized OS applies whatever it staged onto its spare partition
+#   - the wrapper image is pulled again here
+#   - the Bedrock binary is fetched when the container starts (VERSION=LATEST)
+# update.sh reboots the instance, which is what drives all three.
+cat > "$startup_script" <<EOS
+#!/bin/bash
+mkdir -p /var/minecraft
+cd /var/minecraft/ || exit 1
+docker volume create mc-volume
+
+# The Bedrock binary is downloaded at container start and is always current,
+# but it runs against the libraries baked into this image. Pinning the image
+# would leave those to age, so pull it again on every boot.
+#
+# Pull first and replace the container only if that succeeded: a failed pull
+# then leaves the running container untouched.
+if docker pull itzg/minecraft-bedrock-server:latest; then
+  # --restart=always may have started the old container already. Stop it
+  # gracefully first. The image turns SIGTERM into a clean 'stop', while
+  # removing it outright can leave the world half written.
+  docker stop -t 60 mc-server > /dev/null 2>&1
+  docker rm -f mc-server > /dev/null 2>&1
+fi
+
+if ! docker inspect mc-server > /dev/null 2>&1; then
+  docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=${server_name:-ydak} -e GAMEMODE=${game_mode:-survival} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e ALLOW_LIST=false -e MAX_PLAYERS=${max_players:-2} -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e LEVEL_SEED=$seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
+fi
+EOS
+
 external_ip=$(gcloud compute instances create minecraft \
   --format="json" \
   --project="$project_id" \
@@ -244,12 +282,9 @@ external_ip=$(gcloud compute instances create minecraft \
   --tags=minecraft \
   --create-disk="auto-delete=yes,boot=yes,device-name=minecraft,image=$image,mode=rw,size=10,type=projects/$project_id/zones/us-west1-b/diskTypes/pd-standard" --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring \
   --reservation-affinity=any \
-  --metadata=startup-script="#!/bin/bash
-mkdir /var/minecraft && \
-cd /var/minecraft/ && \
-docker volume create mc-volume && \
-docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=${server_name:-ydak} -e GAMEMODE=${game_mode:-survival} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e ALLOW_LIST=false -e MAX_PLAYERS=${max_players:-2} -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e LEVEL_SEED=$seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
-" | jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP')
+  --metadata=cos-update-strategy=update_enabled \
+  --metadata-from-file=startup-script="$startup_script" \
+  | jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP')
 
 echo "Creating server complete!"
 
