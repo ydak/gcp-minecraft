@@ -21,6 +21,26 @@ function num_validation() {
 }
 
 ################################################################################
+# Receives a string and checks if it is a positive integer.
+# Used where the answer is not a menu choice, so num_validation, which only
+# accepts a single digit within a range, does not fit.
+# If it is not valid, exits with error code 1.
+#
+# Arguments:
+#   1: Received input
+# Returns:
+#   None
+################################################################################
+function positive_num_validation() {
+  local received=$1
+
+  if [[ ! ("$received" =~ ^[1-9][0-9]*$) ]]; then
+    echo "[ERROR] Enter a number of 1 or more. (1 以上の数字を入力して下さい。)"
+    exit 1
+  fi
+}
+
+################################################################################
 # Waits until the Bedrock server answers a RakNet unconnected ping.
 # Prints a dot every second while waiting.
 #
