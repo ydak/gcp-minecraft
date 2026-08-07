@@ -62,12 +62,17 @@ for cmd in curl tar; do
 done
 
 # When this script is piped into a shell, stdin is the pipe rather than the
-# terminal. Both the menu below and the prompts in create.sh would then read
-# whatever is left of this script, or hit EOF immediately. Reconnect stdin to
-# the terminal before anything asks a question. Skipped when there is no
-# terminal, which is handled where the menu is shown.
-if [ -c /dev/tty ] && (exec < /dev/tty) 2> /dev/null; then
-  exec < /dev/tty
+# terminal, so the menu below and the prompts in create.sh would read whatever
+# is left of this script instead of the user's answer.
+#
+# The fix is NOT `exec < /dev/tty`. The shell is reading this very script from
+# stdin, so replacing stdin makes it read the remaining lines from the terminal
+# and hang forever, before even reaching the first echo. Redirect per command
+# instead: that is undone as soon as the command returns, leaving the shell's
+# own read of this script alone.
+tty_available=0
+if [ -c /dev/tty ] && (: < /dev/tty) 2> /dev/null; then
+  tty_available=1
 fi
 
 echo "==================== gcp-minecraft ===================="
@@ -92,7 +97,7 @@ fi
 
 # ACTION ==========
 if [ "$ACTION" == "" ]; then
-  if [ ! -t 0 ]; then
+  if [ "$tty_available" == "0" ]; then
     echo "[ERROR] No terminal is available, so the menu cannot be shown."
     echo "        (端末が無いためメニューを表示できません。)"
     echo "        Pass the action directly: ... | bash -s -- create"
@@ -108,7 +113,7 @@ if [ "$ACTION" == "" ]; then
 [3] delete (マインクラフトサーバーを削除)
 EOS
   echo -n "Select action (Default: 1): "
-  read -r action_num
+  read -r action_num < /dev/tty
   if [ "$action_num" == "" ]; then action_num=1 ; fi
   num_validation "$action_num" 3
   ACTION=${action_list[$action_num-1]}
@@ -120,4 +125,12 @@ if [ ! -f "${work_dir}/${ACTION}.sh" ]; then
   exit 1
 fi
 
-bash "${work_dir}/${ACTION}.sh"
+# Same reasoning as above: give the child the terminal through a redirect on
+# this one command. Without a terminal, feed it /dev/null so that its prompts
+# hit EOF and fall back to their defaults, rather than eating whatever is left
+# of this script on stdin.
+if [ "$tty_available" == "1" ]; then
+  bash "${work_dir}/${ACTION}.sh" < /dev/tty
+else
+  bash "${work_dir}/${ACTION}.sh" < /dev/null
+fi
