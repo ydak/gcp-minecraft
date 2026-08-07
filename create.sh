@@ -117,12 +117,41 @@ echo "Enabling compute.googleapis.com ..."
 # NOTE: enabling an API counts against the serviceusage "Mutate requests per
 #       minute" quota. Hitting it fails the whole script under `set -e`, so
 #       retry with a wait longer than the one-minute quota window.
+#       A missing billing account is a precondition failure, not a rate limit,
+#       so retrying never clears it. Bail out immediately in that case.
+enable_log=$(mktemp)
 for i in 1 2 3 4 5; do
-  if gcloud services enable compute.googleapis.com; then break; fi
+  if gcloud services enable compute.googleapis.com >"$enable_log" 2>&1; then
+    cat "$enable_log"
+    break
+  fi
+  cat "$enable_log"
+
+  if grep -qE 'billing-enabled|UREQ_PROJECT_BILLING_NOT_FOUND|Billing account for project' "$enable_log"; then
+    rm -f "$enable_log"
+    cat <<EOS
+
+[ERROR] Billing is not enabled for this project.
+        (このプロジェクトに請求先アカウントがリンクされていません。)
+
+A billing account must be linked even when you stay within the Always Free
+tier. Linking alone does not incur any charges.
+(無料枠の範囲で使う場合でもリンクは必須です。リンクしただけでは課金されません。)
+
+Link a billing account at the following URL, then run this script again.
+(下記から請求先アカウントをリンクし、再度このスクリプトを実行して下さい。)
+
+  https://console.cloud.google.com/billing/linkedaccount?project=$project_id
+
+EOS
+    exit 1
+  fi
+
   echo "  Failed. Retrying in 70s ... ($i/5)"
   echo "  (失敗しました。70秒待って再試行します)"
   sleep 70
 done
+rm -f "$enable_log"
 
 if ! gcloud services list --enabled \
   --filter="config.name=compute.googleapis.com" \
