@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
-script_dir=$(dirname ${0})
-. $script_dir/functions.sh
-. $script_dir/const.sh
+script_dir=$(dirname "${0}")
+# shellcheck source=functions.sh
+. "$script_dir/functions.sh"
+# shellcheck source=const.sh
+. "$script_dir/const.sh"
 
 echo "==================== Start delete minecraft server  ===================="
 
@@ -11,7 +13,7 @@ echo "==================== Start delete minecraft server  ===================="
 echo -n "Setting Google Cloud info ..."
 project_id=$(gcloud config get project)
 project_num=$(gcloud projects list --filter="$project_id" --format="value(PROJECT_NUMBER)")
-gcloud config set project $project_id
+gcloud config set project "$project_id"
 
 SERVER_NAME=minecraft
 FIREWALL_RULE_NAME=minecraft

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
-script_dir=$(dirname ${0})
-. $script_dir/functions.sh
-. $script_dir/const.sh
+script_dir=$(dirname "${0}")
+# shellcheck source=functions.sh
+. "$script_dir/functions.sh"
+# shellcheck source=const.sh
+. "$script_dir/const.sh"
 
 echo "==================== Start create minecraft server  ===================="
 
@@ -14,7 +16,7 @@ project_id=$(gcloud config get project)
 #       matches ANY field. A similarly named project makes it return multiple
 #       lines, which silently corrupts the service account name below.
 project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
-gcloud config set project $project_id
+gcloud config set project "$project_id"
 
 cat <<EOS
 
@@ -51,7 +53,7 @@ EOS
 echo -n "Select game mode (Default: 1): "
 read -r game_mode_num
 if [ "$game_mode_num" == "" ]; then game_mode_num=1 ; fi
-num_validation $game_mode_num 3
+num_validation "$game_mode_num" 3
 game_mode=${game_mode_list[$game_mode_num-1]}
 
 # DIFFICULTY ==========
@@ -66,7 +68,7 @@ EOS
 echo -n "Difficulty (Default: 3): "
 read -r difficulty_num
 if [ "$difficulty_num" == "" ]; then difficulty_num=3 ; fi
-num_validation $difficulty_num 4
+num_validation "$difficulty_num" 4
 difficulty=${difficulty_list[$difficulty_num-1]}
 
 # CHEAT ==========
@@ -79,7 +81,7 @@ EOS
 echo -n "Allow cheat? (Default: 2): "
 read -r allow_cheat_num
 if [ "$allow_cheat_num" == "" ]; then allow_cheat_num=2 ; fi
-num_validation $allow_cheat_num 2
+num_validation "$allow_cheat_num" 2
 allow_cheat=${allow_cheat_list[$allow_cheat_num-1]}
 
 # PERMISSION ==========
@@ -93,7 +95,7 @@ EOS
 echo -n "Default permission (Default: 2): "
 read -r permission_num
 if [ "$permission_num" == "" ]; then permission_num=2 ; fi
-num_validation $permission_num 3
+num_validation "$permission_num" 3
 permission=${permission_num_list[$permission_num-1]}
 
 # SEED ==========
@@ -222,7 +224,7 @@ external_ip=$(gcloud compute instances create minecraft \
   --service-account="$project_num-compute@developer.gserviceaccount.com" \
   --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append \
   --tags=minecraft \
-  --create-disk=auto-delete=yes,boot=yes,device-name=minecraft,image=$image,mode=rw,size=10,type="projects/$project_id/zones/us-west1-b/diskTypes/pd-standard" --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring \
+  --create-disk="auto-delete=yes,boot=yes,device-name=minecraft,image=$image,mode=rw,size=10,type=projects/$project_id/zones/us-west1-b/diskTypes/pd-standard" --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring \
   --reservation-affinity=any \
   --metadata=startup-script="#!/bin/bash
 mkdir /var/minecraft && \
