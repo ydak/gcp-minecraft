@@ -119,13 +119,14 @@ echo "Enabling compute.googleapis.com ..."
 #       retry with a wait longer than the one-minute quota window.
 #       A missing billing account is a precondition failure, not a rate limit,
 #       so retrying never clears it. Bail out immediately in that case.
+#       Stream the output through tee rather than capturing it silently:
+#       enabling the API takes a few minutes and gcloud's own progress output
+#       is the only sign that anything is happening.
 enable_log=$(mktemp)
 for i in 1 2 3 4 5; do
-  if gcloud services enable compute.googleapis.com >"$enable_log" 2>&1; then
-    cat "$enable_log"
-    break
-  fi
-  cat "$enable_log"
+  gcloud services enable compute.googleapis.com 2>&1 | tee "$enable_log"
+  enable_status=${PIPESTATUS[0]}
+  if [ "$enable_status" -eq 0 ]; then break; fi
 
   if grep -qE 'billing-enabled|UREQ_PROJECT_BILLING_NOT_FOUND|Billing account for project' "$enable_log"; then
     rm -f "$enable_log"
@@ -163,14 +164,16 @@ fi
 
 # The default compute service account is created when the API is enabled.
 # Creating an instance before it exists fails, so wait for it to show up.
-echo "Waiting for the default service account ..."
+echo -n "Waiting for the default service account ..."
 for i in $(seq 1 20); do
   if gcloud iam service-accounts describe \
     "$project_num-compute@developer.gserviceaccount.com" >/dev/null 2>&1; then
     break
   fi
+  echo -n "."
   sleep 15
 done
+echo ""
 
 # firewall =====================================================================
 echo "Checking Firewall ..."
@@ -230,18 +233,43 @@ docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=
 
 echo "Creating server complete!"
 
-cat <<EOS
+# The VM is up, but the container still has to be pulled and the world
+# generated. Probe UDP 19132 from here until the server actually answers,
+# so the script does not report success before you can join.
+echo ""
+echo "Waiting for the Minecraft server to start ..."
+echo -n "(マインクラフトサーバーの起動を待っています) "
+
+if wait_for_server "$external_ip" 900; then
+  cat <<EOS
 
 All Done!!
  (すべて完了しました！！)
 
-Wait for a minute and access the minecraft!
 You can access Minecraft using the following IP address!
-(数分後、下記のIPアドレスを使用してあなたのマインクラフトにアクセスしましょう！)
+(下記のIPアドレスを使用してあなたのマインクラフトにアクセスしましょう！)
 
 ################################################################################
 ${external_ip}
 ################################################################################
 
 EOS
+else
+  cat <<EOS
+
+[WARN] The server did not answer within 15 minutes.
+       (15分以内にサーバーが応答しませんでした。)
+
+The VM itself was created, so the container may still be starting.
+Check the log with the following command.
+(VM の作成は完了しています。コンテナ起動中の可能性があるためログを確認して下さい。)
+
+  gcloud compute ssh minecraft --zone=us-west1-b --command='docker logs mc-server | tail -30'
+
+################################################################################
+${external_ip}
+################################################################################
+
+EOS
+fi
 echo "==================== End create minecraft server  ===================="
