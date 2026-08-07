@@ -35,7 +35,7 @@ Enter same passphrase again:
 1. Execute the following command
 
 ```bash
-rm -rf /tmp/ydak-mc ; git clone https://github.com/ydak/gcp-minecraft /tmp/ydak-mc ; /tmp/ydak-mc/create.sh
+curl -fsSL https://raw.githubusercontent.com/ydak/gcp-minecraft/main/install.sh | bash
 ```
 
 ### Update Minecraft server
@@ -46,7 +46,7 @@ If you are unable to play due to a mismatched Minecraft version, run this.
 1. Execute the following command
 
 ```bash
-rm -rf /tmp/ydak-mc ; git clone https://github.com/ydak/gcp-minecraft /tmp/ydak-mc ; /tmp/ydak-mc/update.sh
+curl -fsSL https://raw.githubusercontent.com/ydak/gcp-minecraft/main/install.sh | bash -s -- update
 ```
 
 ### Delete Minecraft server
@@ -55,5 +55,5 @@ rm -rf /tmp/ydak-mc ; git clone https://github.com/ydak/gcp-minecraft /tmp/ydak-
 1. Execute the following command
 
 ```bash
-rm -rf /tmp/ydak-mc ; git clone https://github.com/ydak/gcp-minecraft /tmp/ydak-mc ; /tmp/ydak-mc/delete.sh
+curl -fsSL https://raw.githubusercontent.com/ydak/gcp-minecraft/main/install.sh | bash -s -- delete
 ```
