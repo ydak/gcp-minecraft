@@ -98,6 +98,24 @@ if [ "$permission_num" == "" ]; then permission_num=2 ; fi
 num_validation "$permission_num" 3
 permission=${permission_num_list[$permission_num-1]}
 
+# MAX PLAYERS ==========
+cat <<EOS
+
+-*-*-*-*- [MAX PLAYERS (同時に接続できる最大人数)] -*-*-*-*-
+無料枠の e2-micro はメモリが 1GB しかないため、3 人程度が実用上の上限です。
+それ以上で遊ぶ場合はマシンタイプの変更を検討して下さい。
+(The free tier e2-micro has only 1GB of memory, so around 3 players is the
+ practical limit. Consider a larger machine type if you need more.)
+EOS
+echo -n "Max players (Default: 2): "
+read -r max_players
+if [ "$max_players" == "" ]; then max_players=2 ; fi
+positive_num_validation "$max_players"
+if [ "$max_players" -ge 5 ]; then
+  echo "[WARN] $max_players players may not fit in 1GB of memory."
+  echo "       ($max_players 人はメモリ 1GB に収まらない可能性があります。)"
+fi
+
 # SEED ==========
 cat <<EOS
 
@@ -230,7 +248,7 @@ external_ip=$(gcloud compute instances create minecraft \
 mkdir /var/minecraft && \
 cd /var/minecraft/ && \
 docker volume create mc-volume && \
-docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=${server_name:-ydak} -e GAMEMODE=${game_mode:-survival} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e ALLOW_LIST=false -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e LEVEL_SEED=$seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
+docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=${server_name:-ydak} -e GAMEMODE=${game_mode:-survival} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e ALLOW_LIST=false -e MAX_PLAYERS=${max_players:-2} -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e LEVEL_SEED=$seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
 " | jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP')
 
 echo "Creating server complete!"
