@@ -48,7 +48,7 @@ cat <<EOS
 [2] creative (クリエイティブ)
 [3] adventure (アドベンチャー)
 EOS
-echo -n "Select game mode (Default: survival): "
+echo -n "Select game mode (Default: 1): "
 read -r game_mode_num
 if [ "$game_mode_num" == "" ]; then game_mode_num=1 ; fi
 num_validation $game_mode_num 3
@@ -63,7 +63,7 @@ cat <<EOS
 [3] normal (ノーマル)
 [4] hard (ハード)
 EOS
-echo -n "Difficulty (Default: normal): "
+echo -n "Difficulty (Default: 3): "
 read -r difficulty_num
 if [ "$difficulty_num" == "" ]; then difficulty_num=3 ; fi
 num_validation $difficulty_num 4
@@ -76,7 +76,7 @@ cat <<EOS
 [1] ON (有効)
 [2] OFF (無効)
 EOS
-echo -n "Allow cheat? (Default: OFF): "
+echo -n "Allow cheat? (Default: 2): "
 read -r allow_cheat_num
 if [ "$allow_cheat_num" == "" ]; then allow_cheat_num=2 ; fi
 num_validation $allow_cheat_num 2
@@ -90,7 +90,7 @@ cat <<EOS
 [2] member (メンバー)
 [3] operator (管理者)
 EOS
-echo -n "Default permission (Default: member): "
+echo -n "Default permission (Default: 2): "
 read -r permission_num
 if [ "$permission_num" == "" ]; then permission_num=2 ; fi
 num_validation $permission_num 3
