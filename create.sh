@@ -10,7 +10,10 @@ echo "==================== Start create minecraft server  ===================="
 # GOOGLE CLOUD ==========
 echo -n "Setting Google Cloud info ..."
 project_id=$(gcloud config get project)
-project_num=$(gcloud projects list --filter="$project_id" --format="value(PROJECT_NUMBER)")
+# NOTE: `gcloud projects list --filter="$project_id"` is a bare-word filter that
+#       matches ANY field. A similarly named project makes it return multiple
+#       lines, which silently corrupts the service account name below.
+project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
 gcloud config set project $project_id
 
 cat <<EOS
@@ -45,7 +48,7 @@ cat <<EOS
 [2] creative (クリエイティブ)
 [3] adventure (アドベンチャー)
 EOS
-echo -n "Select game mode (Default: survival): "
+echo -n "Select game mode (Default: 1): "
 read -r game_mode_num
 if [ "$game_mode_num" == "" ]; then game_mode_num=1 ; fi
 num_validation $game_mode_num 3
@@ -60,7 +63,7 @@ cat <<EOS
 [3] normal (ノーマル)
 [4] hard (ハード)
 EOS
-echo -n "Difficulty (Default: normal): "
+echo -n "Difficulty (Default: 3): "
 read -r difficulty_num
 if [ "$difficulty_num" == "" ]; then difficulty_num=3 ; fi
 num_validation $difficulty_num 4
@@ -73,7 +76,7 @@ cat <<EOS
 [1] ON (有効)
 [2] OFF (無効)
 EOS
-echo -n "Allow cheat? (Default: OFF): "
+echo -n "Allow cheat? (Default: 2): "
 read -r allow_cheat_num
 if [ "$allow_cheat_num" == "" ]; then allow_cheat_num=2 ; fi
 num_validation $allow_cheat_num 2
@@ -87,7 +90,7 @@ cat <<EOS
 [2] member (メンバー)
 [3] operator (管理者)
 EOS
-echo -n "Default permission (Default: member): "
+echo -n "Default permission (Default: 2): "
 read -r permission_num
 if [ "$permission_num" == "" ]; then permission_num=2 ; fi
 num_validation $permission_num 3
@@ -111,7 +114,66 @@ echo "Configuration is OK. The next step is to create a minecraft server."
 echo "(サーバー設定が完了しました。マインクラフトサーバーの作成を開始します。)"
 
 echo "Enabling compute.googleapis.com ..."
-gcloud services enable compute.googleapis.com
+# NOTE: enabling an API counts against the serviceusage "Mutate requests per
+#       minute" quota. Hitting it fails the whole script under `set -e`, so
+#       retry with a wait longer than the one-minute quota window.
+#       A missing billing account is a precondition failure, not a rate limit,
+#       so retrying never clears it. Bail out immediately in that case.
+#       Stream the output through tee rather than capturing it silently:
+#       enabling the API takes a few minutes and gcloud's own progress output
+#       is the only sign that anything is happening.
+enable_log=$(mktemp)
+for i in 1 2 3 4 5; do
+  gcloud services enable compute.googleapis.com 2>&1 | tee "$enable_log"
+  enable_status=${PIPESTATUS[0]}
+  if [ "$enable_status" -eq 0 ]; then break; fi
+
+  if grep -qE 'billing-enabled|UREQ_PROJECT_BILLING_NOT_FOUND|Billing account for project' "$enable_log"; then
+    rm -f "$enable_log"
+    cat <<EOS
+
+[ERROR] Billing is not enabled for this project.
+        (このプロジェクトに請求先アカウントがリンクされていません。)
+
+A billing account must be linked even when you stay within the Always Free
+tier. Linking alone does not incur any charges.
+(無料枠の範囲で使う場合でもリンクは必須です。リンクしただけでは課金されません。)
+
+Link a billing account at the following URL, then run this script again.
+(下記から請求先アカウントをリンクし、再度このスクリプトを実行して下さい。)
+
+  https://console.cloud.google.com/billing/linkedaccount?project=$project_id
+
+EOS
+    exit 1
+  fi
+
+  echo "  Failed. Retrying in 70s ... ($i/5)"
+  echo "  (失敗しました。70秒待って再試行します)"
+  sleep 70
+done
+rm -f "$enable_log"
+
+if ! gcloud services list --enabled \
+  --filter="config.name=compute.googleapis.com" \
+  --format="value(config.name)" | grep -q .; then
+  echo "[ERROR] Failed to enable compute.googleapis.com."
+  echo "        (API の有効化に失敗しました。数分置いて再実行して下さい。)"
+  exit 1
+fi
+
+# The default compute service account is created when the API is enabled.
+# Creating an instance before it exists fails, so wait for it to show up.
+echo -n "Waiting for the default service account ..."
+for i in $(seq 1 20); do
+  if gcloud iam service-accounts describe \
+    "$project_num-compute@developer.gserviceaccount.com" >/dev/null 2>&1; then
+    break
+  fi
+  echo -n "."
+  sleep 15
+done
+echo ""
 
 # firewall =====================================================================
 echo "Checking Firewall ..."
@@ -134,7 +196,17 @@ echo "Firewall creation complete!"
 
 # GCE ==========================================================================
 echo "Checking latest COS image ..."
-image=$(gcloud compute images list --format="json" | jq -r '.[] | select(.family | test("cos-stable")) | .selfLink' | sed -E 's/.*(projects.*)/\1/')
+# NOTE: `test("cos-stable")` is a substring regex over every public image
+#       family, so it returns multiple lines the moment another family
+#       containing that string appears. describe-from-family is exact.
+image=$(gcloud compute images describe-from-family cos-stable \
+  --project=cos-cloud --format="value(selfLink)" | sed -E 's|.*/compute/v1/||')
+
+if [ -z "$image" ]; then
+  echo "[ERROR] Failed to resolve the latest COS image."
+  echo "        (COS イメージの取得に失敗しました。)"
+  exit 1
+fi
 echo "COS image check complete."
 
 echo "Creating server for minecraft ..."
@@ -156,23 +228,51 @@ external_ip=$(gcloud compute instances create minecraft \
 mkdir /var/minecraft && \
 cd /var/minecraft/ && \
 docker volume create mc-volume && \
-docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=${server_name:-ydak} -e GAMEMODE=${game_mode:-survival} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e LEVEL_SEED=$seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
+docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=${server_name:-ydak} -e GAMEMODE=${game_mode:-survival} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e ALLOW_LIST=false -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e LEVEL_SEED=$seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
 " | jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP')
 
 echo "Creating server complete!"
 
-cat <<EOS
+# The VM is up, but the container still has to be pulled and the world
+# generated. Probe UDP 19132 from here until the server actually answers,
+# so the script does not report success before you can join.
+echo ""
+echo "Waiting for the Minecraft server to start ..."
+echo -n "(マインクラフトサーバーの起動を待っています) "
+
+if wait_for_server "$external_ip" 900; then
+  cat <<EOS
 
 All Done!!
  (すべて完了しました！！)
 
-Wait for a minute and access the minecraft!
 You can access Minecraft using the following IP address!
-(数分後、下記のIPアドレスを使用してあなたのマインクラフトにアクセスしましょう！)
+(下記のIPアドレスを使用してあなたのマインクラフトにアクセスしましょう！)
+
+################################################################################
+${external_ip}
+################################################################################
+
+NOTE: The allow list is disabled, so anyone who knows this IP address can join.
+      (許可リストは無効です。この IP アドレスを知っていれば誰でも参加できます。)
+
+EOS
+else
+  cat <<EOS
+
+[WARN] The server did not answer within 15 minutes.
+       (15分以内にサーバーが応答しませんでした。)
+
+The VM itself was created, so the container may still be starting.
+Check the log with the following command.
+(VM の作成は完了しています。コンテナ起動中の可能性があるためログを確認して下さい。)
+
+  gcloud compute ssh minecraft --zone=us-west1-b --command='docker logs mc-server | tail -30'
 
 ################################################################################
 ${external_ip}
 ################################################################################
 
 EOS
+fi
 echo "==================== End create minecraft server  ===================="
