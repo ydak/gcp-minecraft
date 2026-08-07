@@ -100,6 +100,20 @@ fi
 
 backup_size=$(du -h "$backup_file" | cut -f1)
 
+# The archive only lives in CloudShell's home directory, which is itself
+# ephemeral, so hand it to the browser rather than leaving the user to find it
+# in the editor. `cloudshell download` asks the browser to start the download.
+# It is missing outside CloudShell, and a refused download should not fail the
+# backup, so neither case is treated as an error.
+if command -v cloudshell > /dev/null; then
+  echo "Starting the download ..."
+  echo "(ブラウザにダウンロードの確認が表示されます)"
+  cloudshell download "$backup_file" || true
+  download_started=1
+else
+  download_started=0
+fi
+
 echo ""
 echo "Waiting for the Minecraft server to come back ..."
 echo -n "(マインクラフトサーバーの再起動を待っています) "
@@ -115,13 +129,27 @@ ${backup_file}
 ${backup_size}
 ################################################################################
 
-CloudShell のエディタからダウンロードできます。
-(Open the CloudShell editor and download the file to keep it off the instance.)
-
 復元するときは restore を選んで下さい。
 (Choose restore to put this world back.)
 
 EOS
+
+  if [ "$download_started" == "1" ]; then
+    cat <<EOS
+ブラウザでのダウンロードを開始しました。
+確認が出ていない場合は、下記でやり直せます。
+(The download has been handed to the browser. Run this again if nothing appeared.)
+
+  cloudshell download ${backup_file}
+
+EOS
+  else
+    cat <<EOS
+CloudShell 以外で実行しているため、自動ダウンロードは行いません。
+(Not running in CloudShell, so the download was not started.)
+
+EOS
+  fi
 else
   cat <<EOS
 
