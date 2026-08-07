@@ -10,7 +10,10 @@ echo "==================== Start create minecraft server  ===================="
 # GOOGLE CLOUD ==========
 echo -n "Setting Google Cloud info ..."
 project_id=$(gcloud config get project)
-project_num=$(gcloud projects list --filter="$project_id" --format="value(PROJECT_NUMBER)")
+# NOTE: `gcloud projects list --filter="$project_id"` is a bare-word filter that
+#       matches ANY field. A similarly named project makes it return multiple
+#       lines, which silently corrupts the service account name below.
+project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
 gcloud config set project $project_id
 
 cat <<EOS
@@ -111,7 +114,34 @@ echo "Configuration is OK. The next step is to create a minecraft server."
 echo "(サーバー設定が完了しました。マインクラフトサーバーの作成を開始します。)"
 
 echo "Enabling compute.googleapis.com ..."
-gcloud services enable compute.googleapis.com
+# NOTE: enabling an API counts against the serviceusage "Mutate requests per
+#       minute" quota. Hitting it fails the whole script under `set -e`, so
+#       retry with a wait longer than the one-minute quota window.
+for i in 1 2 3 4 5; do
+  if gcloud services enable compute.googleapis.com; then break; fi
+  echo "  Failed. Retrying in 70s ... ($i/5)"
+  echo "  (失敗しました。70秒待って再試行します)"
+  sleep 70
+done
+
+if ! gcloud services list --enabled \
+  --filter="config.name=compute.googleapis.com" \
+  --format="value(config.name)" | grep -q .; then
+  echo "[ERROR] Failed to enable compute.googleapis.com."
+  echo "        (API の有効化に失敗しました。数分置いて再実行して下さい。)"
+  exit 1
+fi
+
+# The default compute service account is created when the API is enabled.
+# Creating an instance before it exists fails, so wait for it to show up.
+echo "Waiting for the default service account ..."
+for i in $(seq 1 20); do
+  if gcloud iam service-accounts describe \
+    "$project_num-compute@developer.gserviceaccount.com" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 15
+done
 
 # firewall =====================================================================
 echo "Checking Firewall ..."
@@ -134,7 +164,17 @@ echo "Firewall creation complete!"
 
 # GCE ==========================================================================
 echo "Checking latest COS image ..."
-image=$(gcloud compute images list --format="json" | jq -r '.[] | select(.family | test("cos-stable")) | .selfLink' | sed -E 's/.*(projects.*)/\1/')
+# NOTE: `test("cos-stable")` is a substring regex over every public image
+#       family, so it returns multiple lines the moment another family
+#       containing that string appears. describe-from-family is exact.
+image=$(gcloud compute images describe-from-family cos-stable \
+  --project=cos-cloud --format="value(selfLink)" | sed -E 's|.*/compute/v1/||')
+
+if [ -z "$image" ]; then
+  echo "[ERROR] Failed to resolve the latest COS image."
+  echo "        (COS イメージの取得に失敗しました。)"
+  exit 1
+fi
 echo "COS image check complete."
 
 echo "Creating server for minecraft ..."
@@ -150,7 +190,7 @@ external_ip=$(gcloud compute instances create minecraft \
   --service-account="$project_num-compute@developer.gserviceaccount.com" \
   --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append \
   --tags=minecraft \
-  --create-disk=auto-delete=yes,boot=yes,device-name=minecraft,image=$image,mode=rw,size=10,type="projects/$project_id/zones/us-west1-b/diskTypes/pd-standard" --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring \
+  --create-disk=auto-delete=yes,boot=yes,device-name=minecraft,image=$image,mode=rw,size=30,type="projects/$project_id/zones/us-west1-b/diskTypes/pd-standard" --no-shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring \
   --reservation-affinity=any \
   --metadata=startup-script="#!/bin/bash
 mkdir /var/minecraft && \
