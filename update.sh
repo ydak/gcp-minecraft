@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
-script_dir=$(dirname ${0})
-. $script_dir/functions.sh
+script_dir=$(dirname "${0}")
+# shellcheck source=functions.sh
+. "$script_dir/functions.sh"
 
 ZONE=us-west1-b
 SERVER_NAME=minecraft
@@ -13,7 +14,7 @@ echo "==================== Start minecraft update ===================="
 echo -n "Setting Google Cloud info ..."
 project_id=$(gcloud config get project)
 project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
-gcloud config set project $project_id
+gcloud config set project "$project_id"
 
 # A stopped instance has no external IP, so an empty value is also a failure.
 external_ip=$(gcloud compute instances describe "$SERVER_NAME" --zone="$ZONE" \
