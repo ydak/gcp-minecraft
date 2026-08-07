@@ -228,7 +228,7 @@ external_ip=$(gcloud compute instances create minecraft \
 mkdir /var/minecraft && \
 cd /var/minecraft/ && \
 docker volume create mc-volume && \
-docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=${server_name:-ydak} -e GAMEMODE=${game_mode:-survival} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e LEVEL_SEED=$seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
+docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=${server_name:-ydak} -e GAMEMODE=${game_mode:-survival} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e ALLOW_LIST=false -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e LEVEL_SEED=$seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
 " | jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP')
 
 echo "Creating server complete!"
@@ -252,6 +252,9 @@ You can access Minecraft using the following IP address!
 ################################################################################
 ${external_ip}
 ################################################################################
+
+NOTE: The allow list is disabled, so anyone who knows this IP address can join.
+      (許可リストは無効です。この IP アドレスを知っていれば誰でも参加できます。)
 
 EOS
 else
