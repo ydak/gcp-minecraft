@@ -15,7 +15,7 @@ REPO="ydak/gcp-minecraft"
 REF="${REF:-main}"
 ACTION="${1:-}"
 
-action_list=(create update delete)
+action_list=(create update backup restore delete)
 
 usage() {
   cat <<EOS
@@ -23,15 +23,20 @@ Usage (CloudShell):
 
   curl -fsSL https://raw.githubusercontent.com/${REPO}/main/mc.sh | bash
 
-Then pick create / update / delete from the menu.
-(その後、メニューから create / update / delete を選択します。)
+Then pick what to do from the menu.
+(その後、メニューから操作を選択します。)
+
+  create   Create a Minecraft server (マインクラフトサーバーを作成)
+  update   Update Minecraft and the host (マインクラフトとホストを更新)
+  backup   Save the world to CloudShell (ワールドデータをバックアップ)
+  restore  Put a saved world back (ワールドデータを復元)
+  delete   Delete the server (マインクラフトサーバーを削除)
 
 An action can also be given directly, which skips the menu.
 (操作を引数で直接指定すると、メニューを省略できます。)
 
   ... | bash -s -- create
-  ... | bash -s -- update
-  ... | bash -s -- delete
+  ... | bash -s -- backup
 
 Set REF to use a branch or tag other than main.
 (REF を指定すると main 以外のブランチ・タグを利用できます。)
@@ -39,7 +44,7 @@ EOS
 }
 
 case "$ACTION" in
-  "" | create | update | delete) ;;
+  "" | create | update | backup | restore | delete) ;;
   -h | --help | help)
     usage
     exit 0
@@ -108,14 +113,16 @@ if [ "$ACTION" == "" ]; then
   cat <<EOS
 
 -*-*-*-*- [ACTION (操作を選択)] -*-*-*-*-
-[1] create (マインクラフトサーバーを作成)
-[2] update (マインクラフトを更新)
-[3] delete (マインクラフトサーバーを削除)
+[1] create  (マインクラフトサーバーを作成)
+[2] update  (マインクラフトとホストを更新)
+[3] backup  (ワールドデータをバックアップ)
+[4] restore (ワールドデータを復元)
+[5] delete  (マインクラフトサーバーを削除)
 EOS
   echo -n "Select action (Default: 1): "
   read -r action_num < /dev/tty
   if [ "$action_num" == "" ]; then action_num=1 ; fi
-  num_validation "$action_num" 3
+  num_validation "$action_num" 5
   ACTION=${action_list[$action_num-1]}
 fi
 
