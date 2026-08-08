@@ -8,13 +8,14 @@ script_dir=$(dirname "${0}")
 ZONE=us-west1-b
 SERVER_NAME=minecraft
 
-echo "==================== Start minecraft update ===================="
+echo "==================== Minecraft の更新 ===================="
 
 # GOOGLE CLOUD ==========
-echo -n "Setting Google Cloud info ..."
+echo -n "確認しています ... "
 project_id=$(gcloud config get project)
 project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
-gcloud config set project "$project_id"
+gcloud config set project "$project_id" > /dev/null
+echo "完了"
 
 # A stopped instance has no external IP, so an empty value is also a failure.
 external_ip=$(gcloud compute instances describe "$SERVER_NAME" --zone="$ZONE" \
@@ -71,19 +72,16 @@ if [ "$update_yn" != "y" ]; then exit 1 ; fi
 # Note that the first two only apply to instances created by a create.sh that
 # writes this startup script. On older instances the reboot still refreshes
 # Bedrock, and nothing breaks.
-echo "Checking for OS updates ..."
 os_status=$(gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" \
   --command="sudo update_engine_client --status 2>/dev/null | grep CURRENT_OP" 2>/dev/null || true)
 
 if echo "$os_status" | grep -q "UPDATED_NEED_REBOOT"; then
-  echo "  An OS update is staged and will be applied by this reboot."
-  echo "  (OS の更新が準備済みです。この再起動で適用されます。)"
+  echo "OS の更新が見つかりました。あわせて適用します。"
 else
-  echo "  No OS update is staged."
-  echo "  (準備済みの OS 更新はありません。)"
+  echo "OS の更新はありません。"
 fi
 
-echo "Rebooting to update ..."
+echo -n "  更新しています ... "
 
 # The image turns SIGTERM into a clean `stop`, but the shutdown sequence is
 # less forgiving than `docker stop`, so stop the container explicitly first.
@@ -92,15 +90,14 @@ echo "Rebooting to update ..."
 gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" \
   --command="docker stop -t 60 mc-server && sudo reboot" > /dev/null 2>&1 || true
 
+echo "完了"
 echo ""
-echo "Waiting for the Minecraft server to come back ..."
-echo -n "(マインクラフトサーバーの再起動を待っています) "
+echo -n "マインクラフトの再起動を待っています "
 
 if wait_for_server "$external_ip" 900; then
   cat <<EOS
 
-Minecraft has been updated!
- (マインクラフトの更新が完了しました！)
+更新が完了しました！
 
 ################################################################################
 ${external_ip}
@@ -110,12 +107,10 @@ EOS
 else
   cat <<EOS
 
-[WARN] The server did not answer within 15 minutes.
-       (15分以内にサーバーが応答しませんでした。)
+[WARN] 15 分待ちましたが、サーバーが応答しませんでした。
 
-The container may still be downloading the new version.
-Check the log with the following command.
-(新しいバージョンを取得中の可能性があります。下記でログを確認して下さい。)
+新しいバージョンを取得している途中かもしれません。
+下記でログを確認できます。
 
   gcloud compute ssh $SERVER_NAME --zone=$ZONE --command='docker logs mc-server | tail -30'
 
@@ -123,4 +118,3 @@ EOS
   exit 1
 fi
 
-echo "==================== End minecraft update ===================="

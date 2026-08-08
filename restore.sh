@@ -9,13 +9,14 @@ ZONE=us-west1-b
 SERVER_NAME=minecraft
 BACKUP_DIR="$HOME"
 
-echo "==================== Start minecraft restore ===================="
+echo "==================== ワールドの復元 ===================="
 
 # GOOGLE CLOUD ==========
-echo -n "Setting Google Cloud info ..."
+echo -n "確認しています ... "
 project_id=$(gcloud config get project)
 project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
-gcloud config set project "$project_id"
+gcloud config set project "$project_id" > /dev/null
+echo "完了"
 
 # A stopped instance has no external IP, so an empty value is also a failure.
 external_ip=$(gcloud compute instances describe "$SERVER_NAME" --zone="$ZONE" \
@@ -100,10 +101,10 @@ fi
 backup_file="${backups[$backup_num - 1]}"
 
 # Check the archive here rather than after the world has been replaced.
-echo "Verifying the archive ..."
+echo -n "  データの検証 ... "
 if ! tar tzf "$backup_file" > /dev/null 2>&1; then
-  echo "[ERROR] $(basename "$backup_file") is corrupted."
-  echo "        ($(basename "$backup_file") は壊れています。)"
+  echo "失敗"
+  echo "[ERROR] $(basename "$backup_file") は壊れています。"
   exit 1
 fi
 
@@ -128,10 +129,11 @@ echo -n "よろしいですか? [y/N]: "
 read -r restore_yn
 if [ "$restore_yn" != "y" ]; then exit 1 ; fi
 
-echo "Stopping the server ..."
-gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="docker stop -t 60 mc-server" > /dev/null
+echo ""
+run_step "サーバーの停止" \
+  gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="docker stop -t 60 mc-server"
 
-echo "Uploading the world ..."
+echo -n "  ワールドの書き戻し ... "
 
 # The archive is expanded into a scratch directory first and the current world
 # is only moved aside once that has succeeded. A truncated upload therefore
@@ -165,18 +167,17 @@ EOS
   exit 1
 fi
 
-echo "Restarting the server ..."
-gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="docker start mc-server" > /dev/null
+echo "完了"
+run_step "サーバーの再開" \
+  gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="docker start mc-server"
 
 echo ""
-echo "Waiting for the Minecraft server to come back ..."
-echo -n "(マインクラフトサーバーの再起動を待っています) "
+echo -n "マインクラフトの再開を待っています "
 
 if wait_for_server "$external_ip" 900; then
   cat <<EOS
 
-Restore complete!
- (復元が完了しました！)
+復元が完了しました！
 
 ################################################################################
 ${external_ip}
@@ -201,4 +202,3 @@ EOS
   exit 1
 fi
 
-echo "==================== End minecraft restore ===================="

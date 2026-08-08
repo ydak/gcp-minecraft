@@ -7,16 +7,17 @@ script_dir=$(dirname "${0}")
 # shellcheck source=const.sh
 . "$script_dir/const.sh"
 
-echo "==================== Start create minecraft server  ===================="
+echo "==================== Minecraft サーバーの作成 ===================="
 
 # GOOGLE CLOUD ==========
-echo -n "Setting Google Cloud info ..."
+echo -n "確認しています ... "
 project_id=$(gcloud config get project)
 # NOTE: `gcloud projects list --filter="$project_id"` is a bare-word filter that
 #       matches ANY field. A similarly named project makes it return multiple
 #       lines, which silently corrupts the service account name below.
 project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
-gcloud config set project "$project_id"
+gcloud config set project "$project_id" > /dev/null
+echo "完了"
 
 cat <<EOS
 
@@ -133,26 +134,32 @@ if [ "$seed" != "" ]; then
   fi
 fi
 
-echo "Configuration is OK. The next step is to create a minecraft server."
-echo "(サーバー設定が完了しました。マインクラフトサーバーの作成を開始します。)"
+cat <<EOS
 
-echo "Enabling compute.googleapis.com ..."
+設定が完了しました。サーバーを作成します。数分かかります。
+(Configuration is complete. Creating the server. This takes a few minutes.)
+
+EOS
+
 # NOTE: enabling an API counts against the serviceusage "Mutate requests per
 #       minute" quota. Hitting it fails the whole script under `set -e`, so
 #       retry with a wait longer than the one-minute quota window.
 #       A missing billing account is a precondition failure, not a rate limit,
 #       so retrying never clears it. Bail out immediately in that case.
-#       Stream the output through tee rather than capturing it silently:
-#       enabling the API takes a few minutes and gcloud's own progress output
-#       is the only sign that anything is happening.
+#       The output is captured rather than shown: it is a progress spinner and
+#       an operation id, neither of which is worth reading unless it fails.
 enable_log=$(mktemp)
+echo -n "  Google Cloud の準備 ... "
 for i in 1 2 3 4 5; do
-  gcloud services enable compute.googleapis.com 2>&1 | tee "$enable_log"
-  enable_status=${PIPESTATUS[0]}
+  gcloud services enable compute.googleapis.com > "$enable_log" 2>&1
+  enable_status=$?
   if [ "$enable_status" -eq 0 ]; then break; fi
+
+  if [ "${MC_VERBOSE:-0}" == "1" ]; then cat "$enable_log"; fi
 
   if grep -qE 'billing-enabled|UREQ_PROJECT_BILLING_NOT_FOUND|Billing account for project' "$enable_log"; then
     rm -f "$enable_log"
+    echo "失敗"
     cat <<EOS
 
 [ERROR] Billing is not enabled for this project.
@@ -171,8 +178,7 @@ EOS
     exit 1
   fi
 
-  echo "  Failed. Retrying in 70s ... ($i/5)"
-  echo "  (失敗しました。70秒待って再試行します)"
+  echo -n "再試行しています ($i/5) "
   sleep 70
 done
 rm -f "$enable_log"
@@ -180,31 +186,34 @@ rm -f "$enable_log"
 if ! gcloud services list --enabled \
   --filter="config.name=compute.googleapis.com" \
   --format="value(config.name)" | grep -q .; then
-  echo "[ERROR] Failed to enable compute.googleapis.com."
-  echo "        (API の有効化に失敗しました。数分置いて再実行して下さい。)"
+  echo "失敗"
+  cat <<EOS
+
+[ERROR] Google Cloud の準備に失敗しました。
+        数分おいて、もう一度お試しください。
+        (Failed to enable compute.googleapis.com.)
+
+EOS
   exit 1
 fi
 
 # The default compute service account is created when the API is enabled.
 # Creating an instance before it exists fails, so wait for it to show up.
-echo -n "Waiting for the default service account ..."
 for i in $(seq 1 20); do
   if gcloud iam service-accounts describe \
     "$project_num-compute@developer.gserviceaccount.com" >/dev/null 2>&1; then
     break
   fi
-  echo -n "."
   sleep 15
 done
-echo ""
+echo "完了"
 
 # firewall =====================================================================
-echo "Checking Firewall ..."
 fw_minecraft=$(gcloud compute firewall-rules list --format="json" | jq -r '.[] | select(.name=="minecraft")')
 
 if [ -z "$fw_minecraft" ]; then
-  echo "Firewall minecraft is not found. Creating Firewall for Minecraft ..."
-  gcloud compute --project="$project_id" \
+  run_step "ネットワークの設定" \
+    gcloud compute --project="$project_id" \
     firewall-rules create minecraft \
     --description=minecraft \
     --direction=INGRESS \
@@ -215,10 +224,8 @@ if [ -z "$fw_minecraft" ]; then
     --source-ranges=0.0.0.0/0 \
     --target-tags=minecraft
 fi
-echo "Firewall creation complete!"
 
 # GCE ==========================================================================
-echo "Checking latest COS image ..."
 # NOTE: `test("cos-stable")` is a substring regex over every public image
 #       family, so it returns multiple lines the moment another family
 #       containing that string appears. describe-from-family is exact.
@@ -226,13 +233,15 @@ image=$(gcloud compute images describe-from-family cos-stable \
   --project=cos-cloud --format="value(selfLink)" | sed -E 's|.*/compute/v1/||')
 
 if [ -z "$image" ]; then
-  echo "[ERROR] Failed to resolve the latest COS image."
-  echo "        (COS イメージの取得に失敗しました。)"
+  cat <<EOS
+
+[ERROR] サーバーの土台となるイメージを取得できませんでした。
+        数分おいて、もう一度お試しください。
+        (Failed to resolve the latest COS image.)
+
+EOS
   exit 1
 fi
-echo "COS image check complete."
-
-echo "Creating server for minecraft ..."
 
 # The startup script moved out of --metadata and into --metadata-from-file.
 # --metadata takes comma separated key=value pairs, so a single comma anywhere
@@ -272,7 +281,14 @@ if ! docker inspect mc-server > /dev/null 2>&1; then
 fi
 EOS
 
-external_ip=$(gcloud compute instances create minecraft \
+# gcloud writes the created resource URL and any warnings to stderr. Capture it
+# so the run stays readable, and print it only if the creation actually failed.
+# Splitting the call from the jq parse also means a gcloud failure is caught
+# here rather than being masked by jq's exit status.
+create_log=$(mktemp)
+echo -n "  サーバーの作成 ... "
+
+if ! create_json=$(gcloud compute instances create minecraft \
   --format="json" \
   --project="$project_id" \
   --zone=us-west1-b \
@@ -287,16 +303,29 @@ external_ip=$(gcloud compute instances create minecraft \
   --reservation-affinity=any \
   --metadata=cos-update-strategy=update_enabled \
   --metadata-from-file=startup-script="$startup_script" \
-  | jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP')
+  2> "$create_log"); then
+  echo "失敗"
+  echo ""
+  echo "--------------------------------------------------------------------"
+  cat "$create_log"
+  echo "--------------------------------------------------------------------"
+  rm -f "$create_log"
+  exit 1
+fi
 
-echo "Creating server complete!"
+if [ "${MC_VERBOSE:-0}" == "1" ]; then
+  cat "$create_log"
+fi
+rm -f "$create_log"
+
+external_ip=$(echo "$create_json" | jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP')
+echo "完了"
 
 # The VM is up, but the container still has to be pulled and the world
 # generated. Probe UDP 19132 from here until the server actually answers,
 # so the script does not report success before you can join.
 echo ""
-echo "Waiting for the Minecraft server to start ..."
-echo -n "(マインクラフトサーバーの起動を待っています) "
+echo -n "マインクラフトの起動を待っています "
 
 if wait_for_server "$external_ip" 900; then
   cat <<EOS
@@ -333,4 +362,3 @@ ${external_ip}
 
 EOS
 fi
-echo "==================== End create minecraft server  ===================="

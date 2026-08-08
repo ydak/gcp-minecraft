@@ -85,22 +85,36 @@ if [ -c /dev/tty ] && (: < /dev/tty) 2> /dev/null; then
   tty_available=1
 fi
 
-echo "==================== gcp-minecraft ===================="
+echo "==================== Minecraft サーバー管理 ===================="
 
 work_dir=$(mktemp -d)
 trap 'rm -rf "$work_dir"' EXIT
 
-echo "Downloading ${REPO} (${REF}) ..."
+# The repository name and branch mean nothing to someone who just wants a
+# Minecraft server, so they are kept out of the way unless a specific ref was
+# asked for, in which case showing it is how that choice gets confirmed.
+if [ "$REF" == "main" ]; then
+  echo -n "準備しています ... "
+else
+  echo -n "準備しています (${REF}) ... "
+fi
 
 # pipefail is scoped to this subshell so that a failed download is caught here
 # rather than being masked by tar's exit status.
 if ! (set -o pipefail
       curl -fsSL "https://codeload.github.com/${REPO}/tar.gz/${REF}" \
-        | tar xz -C "$work_dir" --strip-components=1); then
-  echo "[ERROR] Failed to download ${REPO} (${REF})."
-  echo "        (ダウンロードに失敗しました。REF の指定を確認して下さい。)"
+        | tar xz -C "$work_dir" --strip-components=1) > /dev/null 2>&1; then
+  echo "失敗"
+  cat <<EOS
+
+[ERROR] 必要なファイルを取得できませんでした。
+        通信環境を確認して、もう一度お試しください。
+        (Failed to download ${REPO} (${REF}).)
+
+EOS
   exit 1
 fi
+echo "完了"
 
 # shellcheck source=functions.sh
 . "${work_dir}/functions.sh"

@@ -7,13 +7,14 @@ script_dir=$(dirname "${0}")
 # shellcheck source=const.sh
 . "$script_dir/const.sh"
 
-echo "==================== Start delete minecraft server  ===================="
+echo "==================== Minecraft サーバーの削除 ===================="
 
 # GOOGLE CLOUD ==========
-echo -n "Setting Google Cloud info ..."
+echo -n "確認しています ... "
 project_id=$(gcloud config get project)
 project_num=$(gcloud projects list --filter="$project_id" --format="value(PROJECT_NUMBER)")
-gcloud config set project "$project_id"
+gcloud config set project "$project_id" > /dev/null
+echo "完了"
 
 SERVER_NAME=minecraft
 FIREWALL_RULE_NAME=minecraft
@@ -35,11 +36,12 @@ echo -n "よろしいですか? [y/N]: "
 read -r delete_yn
 if [ "$delete_yn" != "y" ]; then exit 1 ; fi
 
-echo "Deleting minecraft server ..."
+echo ""
+run_step "サーバーの削除" \
+  gcloud compute instances delete "$SERVER_NAME" --zone=us-west1-b --quiet
+run_step "ネットワーク設定の削除" \
+  gcloud compute firewall-rules delete "$FIREWALL_RULE_NAME" --quiet
 
-gcloud compute instances delete $SERVER_NAME --zone=us-west1-b --quiet
-gcloud compute firewall-rules delete $FIREWALL_RULE_NAME --quiet
+echo ""
+echo "削除が完了しました。"
 
-echo "Delete complete!"
-
-echo "==================== End delete minecraft server  ===================="
