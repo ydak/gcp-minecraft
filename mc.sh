@@ -2,7 +2,11 @@
 #
 # Bootstrap for gcp-minecraft.
 #
-#   curl -fsSL https://raw.githubusercontent.com/ydak/gcp-minecraft/main/mc.sh | bash
+#   curl -fsSL https://daylifehack.com/mc | bash
+#
+# That URL is a redirect to this file on raw.githubusercontent.com. Going
+# through it keeps the published command short and lets the target be
+# repointed later without reprinting the command everywhere.
 #
 # The scripts in this repository source functions.sh and const.sh from their own
 # directory, so a single file cannot be piped straight into a shell. This
@@ -21,7 +25,7 @@ usage() {
   cat <<EOS
 Usage (CloudShell):
 
-  curl -fsSL https://raw.githubusercontent.com/${REPO}/main/mc.sh | bash
+  curl -fsSL https://daylifehack.com/mc | bash
 
 Then pick what to do from the menu.
 (その後、メニューから操作を選択します。)
@@ -51,7 +55,8 @@ case "$ACTION" in
     ;;
   *)
     echo "[ERROR] Unknown action: $ACTION"
-    echo "        (不明な操作です。create / update / delete のいずれかを指定して下さい。)"
+    echo "        (不明な操作です。create / update / backup / restore / delete の"
+    echo "         いずれかを指定して下さい。)"
     echo ""
     usage
     exit 1

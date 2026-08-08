@@ -18,7 +18,7 @@ Internally, this uses a Docker container.
 1. Execute the following command
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ydak/gcp-minecraft/main/mc.sh | bash
+curl -fsSL https://daylifehack.com/mc | bash
 ```
 
 1. Select what you want to do from the menu
@@ -40,7 +40,14 @@ Select action (Default: 1):
 The action can also be given directly, which skips the menu.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ydak/gcp-minecraft/main/mc.sh | bash -s -- update
+curl -fsSL https://daylifehack.com/mc | bash -s -- update
+```
+
+`https://daylifehack.com/mc` redirects to `mc.sh` in this repository.
+The direct URL also works if you prefer it.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ydak/gcp-minecraft/main/mc.sh | bash
 ```
 
 ## Notes
