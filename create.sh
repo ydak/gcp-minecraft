@@ -327,24 +327,113 @@ echo "完了"
 echo ""
 echo -n "マインクラフトの起動を待っています "
 
-if wait_for_server "$external_ip" 900; then
+ping_info=$(mktemp)
+
+if wait_for_server "$external_ip" 900 "$ping_info"; then
+  # The server reports its own name and version, so take them from there rather
+  # than from what was typed: this is what a client will actually see.
+  MC_VERSION=""
+  if [ -s "$ping_info" ]; then
+    # shellcheck disable=SC1090
+    . "$ping_info"
+  fi
+  rm -f "$ping_info"
+
+  # Everything needed to join, and to manage the server later, gathered in one
+  # place. CloudShell's home directory is not permanent, so the file is handed
+  # to the browser as well.
+  info_file="${HOME}/minecraft-server-info.txt"
+  cat > "$info_file" <<EOS
+====================================================================
+ Minecraft サーバー情報
+====================================================================
+ 作成日時 : $(date '+%Y-%m-%d %H:%M:%S %Z')
+
+--------------------------------------------------------------------
+ 接続情報   ※ 一緒に遊ぶ人に伝える内容
+--------------------------------------------------------------------
+ サーバーアドレス : ${external_ip}
+ ポート           : 19132
+ サーバー名       : ${server_name:-ydak}
+ エディション     : 統合版 (Bedrock)
+ バージョン       : ${MC_VERSION:-(取得できませんでした)}
+
+--------------------------------------------------------------------
+ ゲーム設定
+--------------------------------------------------------------------
+ ゲームモード : ${game_mode:-survival}
+ 難易度       : ${difficulty:-normal}
+ チート       : ${allow_cheat:-false}
+ 参加者の権限 : ${permission:-member}
+ 最大人数     : ${max_players:-2}
+ シード値     : ${seed:-(ランダム)}
+
+--------------------------------------------------------------------
+ 管理情報   ※ 自分用。共有する必要はありません
+--------------------------------------------------------------------
+ プロジェクト ID  : ${project_id}
+ プロジェクト番号 : ${project_num}
+ インスタンス名   : minecraft
+ ゾーン           : us-west1-b
+ マシンタイプ     : e2-micro
+
+--------------------------------------------------------------------
+ 操作方法
+--------------------------------------------------------------------
+ CloudShell で下記を実行し、メニューから選びます。
+
+   curl -fsSL https://daylifehack.com/mc | bash
+
+   create  : サーバーを作成する
+   update  : マインクラフトとホストを更新する
+   backup  : ワールドをバックアップする
+   restore : ワールドを復元する
+   delete  : サーバーを削除する (ワールドも消えます)
+
+--------------------------------------------------------------------
+ 注意
+--------------------------------------------------------------------
+ ・許可リストは無効です。この IP を知っていれば誰でも参加できます。
+ ・サーバーを停止・起動すると IP アドレスが変わります。
+   再起動 (reboot) では変わりません。
+ ・無料枠で動かせるサーバーは 1 台までです。
+ ・下り通信は 1GB/月 まで無料です。超過分は約 \$0.12/GB です。
+   目安として 1 人が 1 時間遊ぶとおよそ 36MB です。
+====================================================================
+EOS
+
   cat <<EOS
 
-All Done!!
- (すべて完了しました！！)
-
-You can access Minecraft using the following IP address!
-(下記のIPアドレスを使用してあなたのマインクラフトにアクセスしましょう！)
+すべて完了しました！
 
 ################################################################################
 ${external_ip}
 ################################################################################
 
-NOTE: The allow list is disabled, so anyone who knows this IP address can join.
-      (許可リストは無効です。この IP アドレスを知っていれば誰でも参加できます。)
+ ポート : 19132
+ 上記のアドレスとポートで、マインクラフトから接続できます。
+
+ 許可リストは無効です。この IP を知っていれば誰でも参加できます。
 
 EOS
+
+  # `cloudshell download` is missing outside CloudShell, and a refused download
+  # should not fail a successful build, so neither case is treated as an error.
+  if command -v cloudshell > /dev/null; then
+    cat <<EOS
+接続情報を ${info_file} に保存しました。
+ブラウザにダウンロードの確認が表示されます。
+
+EOS
+    cloudshell download "$info_file" || true
+  else
+    cat <<EOS
+接続情報を ${info_file} に保存しました。
+
+EOS
+  fi
 else
+  rm -f "$ping_info"
   cat <<EOS
 
 [WARN] The server did not answer within 15 minutes.

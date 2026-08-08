@@ -97,12 +97,14 @@ function positive_num_validation() {
 # Arguments:
 #   1: External IP address of the server
 #   2: Timeout in seconds
+#   3: Optional path to write the answered details to, as shell assignments
 # Returns:
 #   0 if the server answered, 1 on timeout
 ################################################################################
 function wait_for_server() {
   local ip=$1
   local timeout=$2
+  local info_path=${3:-}
 
   if ! command -v python3 > /dev/null; then
     echo ""
@@ -111,7 +113,8 @@ function wait_for_server() {
     return 0
   fi
 
-  python3 - "$ip" "$timeout" <<'PYEOF'
+  python3 - "$ip" "$timeout" "$info_path" <<'PYEOF'
+import shlex
 import socket
 import struct
 import sys
@@ -123,6 +126,7 @@ PORT = 19132
 
 ip = sys.argv[1]
 deadline = time.time() + int(sys.argv[2])
+info_path = sys.argv[3] if len(sys.argv) > 3 else ""
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.settimeout(1.0)
@@ -145,6 +149,17 @@ while time.time() < deadline:
             print("  Server name : %s" % fields[1])
             print("  Version     : %s" % fields[3])
             print("  Players     : %s/%s" % (fields[4], fields[5]))
+            # The MOTD is whatever the operator typed, so quote every value
+            # before it is sourced back into the shell.
+            if info_path:
+                lines = [
+                    "MC_NAME=" + shlex.quote(fields[1]),
+                    "MC_VERSION=" + shlex.quote(fields[3]),
+                    "MC_MAX_PLAYERS=" + shlex.quote(fields[5]),
+                    "",
+                ]
+                with open(info_path, "w", encoding="utf-8") as fh:
+                    fh.write(chr(10).join(lines))
         sys.exit(0)
 
     sys.stdout.write(".")
