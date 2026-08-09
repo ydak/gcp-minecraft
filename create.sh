@@ -403,7 +403,15 @@ echo " 完了"
 # The VM is up, but the container still has to be pulled and the world
 # generated. Probe UDP 19132 from here until the server actually answers,
 # so the script does not report success before you can join.
-echo ""
+#
+# The notice comes before the wait rather than with the prompt itself: the wait
+# runs for minutes, and a screen that is not moving is easy to walk away from.
+cat <<EOS
+
+※ サーバー起動完了時、サーバー情報のファイルダウンロードが促されます。
+   こちらをダウンロードし、保管してください。
+
+EOS
 echo -n "マインクラフト起動中 "
 
 ping_info=$(mktemp)
