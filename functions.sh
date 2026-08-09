@@ -10,6 +10,10 @@ function wait_with_dots() {
   local pid=$1
   local status=0
 
+  # Start at three so the label never sits on its own for a moment, then add one
+  # a second from there.
+  echo -n "..."
+
   while kill -0 "$pid" 2> /dev/null; do
     echo -n "."
     sleep 1
@@ -178,6 +182,10 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 # land on a dot a second, rather than drifting out to two.
 sock.settimeout(0.8)
 next_tick = time.time()
+
+# Same three-dot head start as wait_with_dots, so both read the same way.
+sys.stdout.write("...")
+sys.stdout.flush()
 
 while time.time() < deadline:
     # ID_UNCONNECTED_PING: id(1) + time(8) + magic(16) + client guid(8)

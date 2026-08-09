@@ -106,6 +106,7 @@ fi
  curl -fsSL "https://codeload.github.com/${REPO}/tar.gz/${REF}" \
    | tar xz -C "$work_dir" --strip-components=1) > /dev/null 2>&1 &
 download_pid=$!
+echo -n "..."
 while kill -0 "$download_pid" 2> /dev/null; do
   echo -n "."
   sleep 1
