@@ -9,7 +9,9 @@ ZONE=us-west1-b
 SERVER_NAME=minecraft
 BACKUP_DIR="$HOME"
 
+echo ""
 echo "==================== ワールドの復元 ===================="
+echo ""
 
 # GOOGLE CLOUD ==========
 # Run in the background so the dots reflect real elapsed time rather than
@@ -101,6 +103,7 @@ mapfile -t backups < <(printf '%s\n' "${backups[@]}" | sort -r)
 cat <<EOS
 
 -*-*-*-*- [BACKUP (復元するバックアップを選択)] -*-*-*-*-
+
 EOS
 i=1
 for b in "${backups[@]}"; do
@@ -141,6 +144,7 @@ fi
 cat <<EOS
 
 -*-*-*-*- [復元対象の確認] -*-*-*-*-
+
 プロジェクト ID
 　$project_id
 プロジェクト番号

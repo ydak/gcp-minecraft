@@ -9,7 +9,9 @@ ZONE=us-west1-b
 SERVER_NAME=minecraft
 BACKUP_DIR="$HOME"
 
+echo ""
 echo "==================== ワールドのバックアップ ===================="
+echo ""
 
 # GOOGLE CLOUD ==========
 # Run in the background so the dots reflect real elapsed time rather than
@@ -79,6 +81,7 @@ echo " 完了"
 cat <<EOS
 
 -*-*-*-*- [バックアップ対象の確認] -*-*-*-*-
+
 プロジェクト ID
 　$project_id
 プロジェクト番号

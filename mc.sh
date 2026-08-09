@@ -86,7 +86,9 @@ if [ -c /dev/tty ] && (: < /dev/tty) 2> /dev/null; then
   tty_available=1
 fi
 
+echo ""
 echo "==================== Minecraft サーバー管理 ===================="
+echo ""
 
 work_dir=$(mktemp -d)
 trap 'rm -rf "$work_dir"' EXIT
@@ -144,6 +146,7 @@ if [ "$ACTION" == "" ]; then
   cat <<EOS
 
 -*-*-*-*- [ACTION (操作を選択)] -*-*-*-*-
+
 [1] create  (マインクラフトサーバーを作成)
 [2] update  (マインクラフトとホストを更新)
 [3] config  (マインクラフトの設定を変更)

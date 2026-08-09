@@ -10,7 +10,9 @@ script_dir=$(dirname "${0}")
 ZONE=us-west1-b
 SERVER_NAME=minecraft
 
+echo ""
 echo "==================== Minecraft の設定変更 ===================="
+echo ""
 
 # GOOGLE CLOUD ==========
 # Run in the background so the dots reflect real elapsed time rather than
@@ -185,6 +187,7 @@ EOS
 cat <<EOS
 
 -*-*-*-*- [現在の設定] -*-*-*-*-
+
 プロジェクト : ${project_id} (${project_num})
 $(print_settings)
 
@@ -196,6 +199,7 @@ EOS
 cat <<EOS
 
 -*-*-*-*- [SERVER NAME (マインクラフトサーバー名)] -*-*-*-*-
+
 EOS
 echo -n "Server name (Default: ${server_name}): "
 read -r input
@@ -206,6 +210,7 @@ game_mode_default=$(index_of "$game_mode" "${game_mode_list[@]}")
 cat <<EOS
 
 -*-*-*-*- [GAME MODE (ゲームモードを選択)] -*-*-*-*-
+
 [1] survival (サバイバル)
 [2] creative (クリエイティブ)
 [3] adventure (アドベンチャー)
@@ -221,6 +226,7 @@ difficulty_default=$(index_of "$difficulty" "${difficulty_list[@]}")
 cat <<EOS
 
 -*-*-*-*- [DIFFICULTY (難易度を選択)] -*-*-*-*-
+
 [1] peaceful (ピースフル)
 [2] easy (イージー)
 [3] normal (ノーマル)
@@ -237,6 +243,7 @@ allow_cheat_default=$(index_of "$allow_cheat" "${allow_cheat_list[@]}")
 cat <<EOS
 
 -*-*-*-*- [CHEAT (チートを有効にするかどうか)] -*-*-*-*-
+
 [1] ON (有効)
 [2] OFF (無効)
 EOS
@@ -251,6 +258,7 @@ permission_default=$(index_of "$permission" "${permission_num_list[@]}")
 cat <<EOS
 
 -*-*-*-*- [PERMISSION (サーバーに参加するユーザー全員の権限)] -*-*-*-*-
+
 [1] visitor (訪問者)
 [2] member (メンバー)
 [3] operator (管理者)
@@ -265,6 +273,7 @@ permission=${permission_num_list[$input-1]}
 cat <<EOS
 
 -*-*-*-*- [MAX PLAYERS (同時に接続できる最大人数)] -*-*-*-*-
+
 無料枠の e2-micro はメモリが 1GB しかないため、3 人程度が実用上の上限です。
 EOS
 echo -n "Max players (Default: ${max_players}): "
@@ -281,6 +290,7 @@ fi
 cat <<EOS
 
 -*-*-*-*- [VIEW DISTANCE (描画距離。単位はチャンク)] -*-*-*-*-
+
 大きくすると遠くまで見えますが、通信量とメモリを多く使います。
 見える範囲の広さの二乗で効くため、通信量への影響が最も大きい設定です。
 Minecraft の既定は 32 ですが、作成時は通信量を抑えるため 5 にしています。
@@ -303,6 +313,7 @@ fi
 cat <<EOS
 
 -*-*-*-*- [詳細設定] -*-*-*-*-
+
 ゲームモードの強制、許可リスト、放置切断、チャット制限などを変更できます。
 必要なければ、そのまま Enter で飛ばせます。
 EOS
@@ -315,6 +326,7 @@ if [ "$advanced_yn" == "y" ]; then
   cat <<EOS
 
 -*-*-*-*- [FORCE GAMEMODE (ゲームモードの強制)] -*-*-*-*-
+
 ON にすると、参加者が個別に設定していても、上のゲームモードを強制します。
 [1] ON (強制する)
 [2] OFF (各自の設定を尊重する)
@@ -330,6 +342,7 @@ EOS
   cat <<EOS
 
 -*-*-*-*- [ALLOW LIST (許可リスト)] -*-*-*-*-
+
 ON にすると、登録した人しか参加できなくなります。
 IP アドレスが漏れても他人が入れないため、安全性が上がります。
 [1] ON (登録した人だけ参加できる)
@@ -345,6 +358,7 @@ EOS
     cat <<EOS
 
 -*-*-*-*- [ALLOW LIST USERS (参加を許可する人)] -*-*-*-*-
+
 参加する人のゲーマータグを、カンマ区切りで入力してください。
 自分を含め、参加する人を全員書いてください。ここに無い人は入れません。
 
@@ -396,6 +410,7 @@ EOS
   cat <<EOS
 
 -*-*-*-*- [TICK DISTANCE (シミュレーション距離。単位はチャンク)] -*-*-*-*-
+
 プレイヤーから何チャンク先まで世界を動かすかです。
 大きくすると遠くの装置が動きますが、負荷が上がります。
 動いている範囲で起きた変化は接続中の全員へ送られるため、通信量も増えます。
@@ -417,6 +432,7 @@ EOS
   cat <<EOS
 
 -*-*-*-*- [PLAYER IDLE TIMEOUT (放置時の切断までの分数)] -*-*-*-*-
+
 操作しないまま指定の分数が過ぎると切断されます。
 0 を指定すると切断しません。放置による通信量を抑える効果があります。
 EOS
@@ -435,6 +451,7 @@ EOS
   cat <<EOS
 
 -*-*-*-*- [CHAT RESTRICTION (チャットの制限)] -*-*-*-*-
+
 [1] None (制限しない)
 [2] Dropped (発言できるが誰にも届かない)
 [3] Disabled (チャット欄そのものを出さない)
@@ -450,6 +467,7 @@ EOS
   cat <<EOS
 
 -*-*-*-*- [DISABLE PLAYER INTERACTION (プレイヤー同士の干渉を無効化)] -*-*-*-*-
+
 ON にすると、押し合いや攻撃などの相互作用が無くなります。
 [1] ON (干渉しない)
 [2] OFF (通常どおり)
@@ -465,6 +483,7 @@ EOS
   cat <<EOS
 
 -*-*-*-*- [TEXTUREPACK REQUIRED (テクスチャパックの強制)] -*-*-*-*-
+
 ON にすると、サーバーのテクスチャパックの使用を参加者に強制します。
 [1] ON (強制する)
 [2] OFF (各自の設定を尊重する)
@@ -480,6 +499,7 @@ EOS
   cat <<EOS
 
 -*-*-*-*- [DISABLE CUSTOM SKINS (自作スキンの禁止)] -*-*-*-*-
+
 ON にすると、外部で作られた自作スキンを使えなくします。
 不適切なスキンを防ぎたい場合に使います。
 [1] ON (禁止する)
@@ -495,6 +515,7 @@ fi
 cat <<EOS
 
 -*-*-*-*- [変更後の設定] -*-*-*-*-
+
 $(print_settings)
 
 この内容で設定を変更します。

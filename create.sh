@@ -7,7 +7,9 @@ script_dir=$(dirname "${0}")
 # shellcheck source=const.sh
 . "$script_dir/const.sh"
 
+echo ""
 echo "==================== Minecraft サーバーの作成 ===================="
+echo ""
 
 # GOOGLE CLOUD ==========
 # Run in the background so the dots reflect real elapsed time rather than being
@@ -92,6 +94,7 @@ fi
 cat <<EOS
 
 -*-*-*-*- [GOOGLE CLOUD (Google Cloud の情報確認)] -*-*-*-*-
+
 プロジェクト ID  : $project_id
 プロジェクト番号 : $project_num
 
@@ -110,6 +113,7 @@ if [ "$gcp_info" != "y" ]; then exit 1 ; fi
 cat <<EOS
 
 -*-*-*-*- [SERVER NAME (マインクラフトサーバー名を自由に決めて下さい)] -*-*-*-*-
+
 EOS
 echo -n "Server name (Default: ydak): "
 read -r server_name
@@ -118,6 +122,7 @@ read -r server_name
 cat <<EOS
 
 -*-*-*-*- [GAME MODE (ゲームモードを選択)] -*-*-*-*-
+
 [1] survival (サバイバル)
 [2] creative (クリエイティブ)
 [3] adventure (アドベンチャー)
@@ -132,6 +137,7 @@ game_mode=${game_mode_list[$game_mode_num-1]}
 cat <<EOS
 
 -*-*-*-*- [DIFFICULTY (難易度を選択)] -*-*-*-*-
+
 [1] peaceful (ピースフル)
 [2] easy (イージー)
 [3] normal (ノーマル)
@@ -147,6 +153,7 @@ difficulty=${difficulty_list[$difficulty_num-1]}
 cat <<EOS
 
 -*-*-*-*- [CHEAT (チートを有効にするかどうか)] -*-*-*-*-
+
 [1] ON (有効)
 [2] OFF (無効)
 EOS
@@ -160,6 +167,7 @@ allow_cheat=${allow_cheat_list[$allow_cheat_num-1]}
 cat <<EOS
 
 -*-*-*-*- [PERMISSION (サーバーに参加するユーザー全員の権限)] -*-*-*-*-
+
 [1] visitor (訪問者)
 [2] member (メンバー)
 [3] operator (管理者)
@@ -174,6 +182,7 @@ permission=${permission_num_list[$permission_num-1]}
 cat <<EOS
 
 -*-*-*-*- [MAX PLAYERS (同時に接続できる最大人数)] -*-*-*-*-
+
 無料枠の e2-micro はメモリが 1GB しかないため、3 人程度が実用上の上限です。
 それ以上で遊ぶ場合はマシンタイプの変更を検討して下さい。
 (The free tier e2-micro has only 1GB of memory, so around 3 players is the
@@ -192,6 +201,7 @@ fi
 cat <<EOS
 
 -*-*-*-*- [SEED (シード値を入力。入力しない場合はランダム)] -*-*-*-*-
+
 EOS
 echo -n "Seed (Default: random): "
 read -r seed
