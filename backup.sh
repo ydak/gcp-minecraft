@@ -13,9 +13,9 @@ echo "==================== ワールドのバックアップ ===================
 
 # GOOGLE CLOUD ==========
 echo -n "確認中 ... "
-project_id=$(gcloud config get project)
+project_id=$(gcloud config get project 2> /dev/null)
 project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
-gcloud config set project "$project_id" > /dev/null
+gcloud config set project "$project_id" > /dev/null 2>&1
 echo "完了"
 
 # A stopped instance has no external IP, so an empty value is also a failure.
@@ -35,9 +35,20 @@ EOS
   exit 1
 fi
 
-world_size=$(gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" \
+# The first `gcloud compute ssh` in a fresh CloudShell generates an SSH key.
+# Without --quiet it stops on a confirmation prompt, and with stderr discarded
+# that prompt is invisible, so the script looks like it has hung. --quiet
+# answers it, and the dots show that something is still happening: key
+# generation and the first connection together take the best part of a minute.
+echo -n "  サーバーへ接続中 "
+size_out=$(mktemp)
+gcloud compute ssh --quiet --zone "$ZONE" "$SERVER_NAME" \
   --command="docker run --rm -v mc-volume:/data busybox du -sh /data/worlds 2>/dev/null | cut -f1" \
-  2>/dev/null || true)
+  > "$size_out" 2>/dev/null &
+wait_with_dots $! || true
+world_size=$(cat "$size_out" 2>/dev/null || true)
+rm -f "$size_out"
+echo " 完了"
 
 cat <<EOS
 
@@ -70,27 +81,32 @@ backup_file="${BACKUP_DIR}/minecraft-backup-${timestamp}.tar.gz"
 # restore. The image turns SIGTERM into a clean `stop`.
 echo ""
 run_step "サーバーの停止中" \
-  gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="docker stop -t 60 mc-server"
+  gcloud compute ssh --quiet --zone "$ZONE" "$SERVER_NAME" --command="docker stop -t 60 mc-server"
 
-echo -n "  ワールドの取得中 ... "
+echo -n "  ワールドの取得中 "
 
 # busybox is a couple of megabytes and is guaranteed to carry tar and sh, so it
 # is used rather than reaching into the volume's host path, which would need
 # sudo. The archive is streamed straight to CloudShell: no temporary file is
 # written on the instance, whose /tmp is RAM backed and whose disk is only 10GB.
-if ! gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" \
+gcloud compute ssh --quiet --zone "$ZONE" "$SERVER_NAME" \
   --command="docker run --rm -v mc-volume:/data busybox tar cz -C /data worlds" \
-  > "$backup_file" 2>/dev/null; then
+  > "$backup_file" 2>/dev/null &
+
+download_status=0
+wait_with_dots $! || download_status=$?
+
+if [ "$download_status" -ne 0 ]; then
   rm -f "$backup_file"
-  echo "失敗"
+  echo " 失敗"
   echo "[ERROR] ワールドを取得できませんでした。"
-  gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="docker start mc-server" > /dev/null || true
+  gcloud compute ssh --quiet --zone "$ZONE" "$SERVER_NAME" --command="docker start mc-server" > /dev/null 2>&1 || true
   exit 1
 fi
 
-echo "完了"
+echo " 完了"
 run_step "サーバーの再開中" \
-  gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="docker start mc-server"
+  gcloud compute ssh --quiet --zone "$ZONE" "$SERVER_NAME" --command="docker start mc-server"
 
 # Reading the archive back decompresses every entry and checks the gzip CRC, so
 # this catches a truncated or corrupted transfer before it is trusted.
@@ -166,7 +182,7 @@ ${backup_size}
 Check the log with the following command.
 (下記でログを確認して下さい。)
 
-  gcloud compute ssh $SERVER_NAME --zone=$ZONE --command='docker logs mc-server | tail -30'
+  gcloud compute ssh --quiet $SERVER_NAME --zone=$ZONE --command='docker logs mc-server | tail -30'
 
 EOS
   exit 1

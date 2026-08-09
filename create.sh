@@ -11,12 +11,12 @@ echo "==================== Minecraft サーバーの作成 ===================="
 
 # GOOGLE CLOUD ==========
 echo -n "確認中 ... "
-project_id=$(gcloud config get project)
+project_id=$(gcloud config get project 2> /dev/null)
 # NOTE: `gcloud projects list --filter="$project_id"` is a bare-word filter that
 #       matches ANY field. A similarly named project makes it return multiple
 #       lines, which silently corrupts the service account name below.
 project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
-gcloud config set project "$project_id" > /dev/null
+gcloud config set project "$project_id" > /dev/null 2>&1
 echo "完了"
 
 cat <<EOS
@@ -488,7 +488,7 @@ The VM itself was created, so the container may still be starting.
 Check the log with the following command.
 (VM の作成は完了しています。コンテナ起動中の可能性があるためログを確認して下さい。)
 
-  gcloud compute ssh minecraft --zone=us-west1-b --command='docker logs mc-server | tail -30'
+  gcloud compute ssh --quiet minecraft --zone=us-west1-b --command='docker logs mc-server | tail -30'
 
 ################################################################################
 ${external_ip}

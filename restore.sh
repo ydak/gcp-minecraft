@@ -13,9 +13,9 @@ echo "==================== ワールドの復元 ===================="
 
 # GOOGLE CLOUD ==========
 echo -n "確認中 ... "
-project_id=$(gcloud config get project)
+project_id=$(gcloud config get project 2> /dev/null)
 project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
-gcloud config set project "$project_id" > /dev/null
+gcloud config set project "$project_id" > /dev/null 2>&1
 echo "完了"
 
 # A stopped instance has no external IP, so an empty value is also a failure.
@@ -131,9 +131,9 @@ if [ "$restore_yn" != "y" ]; then exit 1 ; fi
 
 echo ""
 run_step "サーバーの停止中" \
-  gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="docker stop -t 60 mc-server"
+  gcloud compute ssh --quiet --zone "$ZONE" "$SERVER_NAME" --command="docker stop -t 60 mc-server"
 
-echo -n "  ワールドの書き戻し中 ... "
+echo -n "  ワールドの書き戻し中 "
 
 # The archive is expanded into a scratch directory first and the current world
 # is only moved aside once that has succeeded. A truncated upload therefore
@@ -151,8 +151,14 @@ mv /data/.restore/worlds /data/worlds
 rm -rf /data/.restore
 "'
 
-if ! gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="$restore_cmd" \
-  < "$backup_file" > /dev/null 2>&1; then
+gcloud compute ssh --quiet --zone "$ZONE" "$SERVER_NAME" --command="$restore_cmd" \
+  < "$backup_file" > /dev/null 2>&1 &
+
+restore_status=0
+wait_with_dots $! || restore_status=$?
+
+if [ "$restore_status" -ne 0 ]; then
+  echo " 失敗"
   cat <<EOS
 
 [ERROR] Failed to restore the world. (ワールドの復元に失敗しました。)
@@ -163,13 +169,13 @@ archive has been expanded successfully.
  変更されていません。)
 
 EOS
-  gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="docker start mc-server" > /dev/null || true
+  gcloud compute ssh --quiet --zone "$ZONE" "$SERVER_NAME" --command="docker start mc-server" > /dev/null 2>&1 || true
   exit 1
 fi
 
-echo "完了"
+echo " 完了"
 run_step "サーバーの再開中" \
-  gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="docker start mc-server"
+  gcloud compute ssh --quiet --zone "$ZONE" "$SERVER_NAME" --command="docker start mc-server"
 
 echo ""
 echo -n "マインクラフト再開中 "
@@ -196,7 +202,7 @@ else
 Check the log with the following command.
 (下記でログを確認して下さい。)
 
-  gcloud compute ssh $SERVER_NAME --zone=$ZONE --command='docker logs mc-server | tail -30'
+  gcloud compute ssh --quiet $SERVER_NAME --zone=$ZONE --command='docker logs mc-server | tail -30'
 
 EOS
   exit 1

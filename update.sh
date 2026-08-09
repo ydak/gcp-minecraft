@@ -12,9 +12,9 @@ echo "==================== Minecraft の更新 ===================="
 
 # GOOGLE CLOUD ==========
 echo -n "確認中 ... "
-project_id=$(gcloud config get project)
+project_id=$(gcloud config get project 2> /dev/null)
 project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
-gcloud config set project "$project_id" > /dev/null
+gcloud config set project "$project_id" > /dev/null 2>&1
 echo "完了"
 
 # A stopped instance has no external IP, so an empty value is also a failure.
@@ -72,8 +72,17 @@ if [ "$update_yn" != "y" ]; then exit 1 ; fi
 # Note that the first two only apply to instances created by a create.sh that
 # writes this startup script. On older instances the reboot still refreshes
 # Bedrock, and nothing breaks.
-os_status=$(gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" \
-  --command="sudo update_engine_client --status 2>/dev/null | grep CURRENT_OP" 2>/dev/null || true)
+# The first `gcloud compute ssh` in a fresh CloudShell generates an SSH key,
+# which takes long enough to look like a hang with no output at all.
+echo -n "  サーバーへ接続中 "
+os_out=$(mktemp)
+gcloud compute ssh --quiet --zone "$ZONE" "$SERVER_NAME" \
+  --command="sudo update_engine_client --status 2>/dev/null | grep CURRENT_OP" \
+  > "$os_out" 2>/dev/null &
+wait_with_dots $! || true
+os_status=$(cat "$os_out" 2>/dev/null || true)
+rm -f "$os_out"
+echo " 完了"
 
 if echo "$os_status" | grep -q "UPDATED_NEED_REBOOT"; then
   echo "OS の更新が見つかりました。あわせて適用します。"
@@ -87,7 +96,7 @@ echo -n "  更新中 ... "
 # less forgiving than `docker stop`, so stop the container explicitly first.
 # The connection drops as the instance goes down, so ssh reports failure here;
 # wait_for_server below is what actually confirms the outcome.
-gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" \
+gcloud compute ssh --quiet --zone "$ZONE" "$SERVER_NAME" \
   --command="docker stop -t 60 mc-server && sudo reboot" > /dev/null 2>&1 || true
 
 echo "完了"
@@ -112,7 +121,7 @@ else
 新しいバージョンを取得している途中かもしれません。
 下記でログを確認できます。
 
-  gcloud compute ssh $SERVER_NAME --zone=$ZONE --command='docker logs mc-server | tail -30'
+  gcloud compute ssh --quiet $SERVER_NAME --zone=$ZONE --command='docker logs mc-server | tail -30'
 
 EOS
   exit 1

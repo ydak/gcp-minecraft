@@ -11,9 +11,9 @@ echo "==================== Minecraft サーバーの削除 ===================="
 
 # GOOGLE CLOUD ==========
 echo -n "確認中 ... "
-project_id=$(gcloud config get project)
+project_id=$(gcloud config get project 2> /dev/null)
 project_num=$(gcloud projects list --filter="$project_id" --format="value(PROJECT_NUMBER)")
-gcloud config set project "$project_id" > /dev/null
+gcloud config set project "$project_id" > /dev/null 2>&1
 echo "完了"
 
 SERVER_NAME=minecraft
