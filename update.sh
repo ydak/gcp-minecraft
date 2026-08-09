@@ -11,11 +11,37 @@ SERVER_NAME=minecraft
 echo "==================== Minecraft の更新 ===================="
 
 # GOOGLE CLOUD ==========
-echo -n "確認中 ... "
-project_id=$(gcloud config get project 2> /dev/null)
-project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
-gcloud config set project "$project_id" > /dev/null 2>&1
-echo "完了"
+# Run in the background so the dots reflect real elapsed time rather than
+# being three characters printed up front.
+# Declared up front: they are assigned by sourcing the file the subshell
+# writes, which neither shellcheck nor set -e can see into.
+project_id=""
+project_num=""
+echo -n "確認中 "
+gcloud_info=$(mktemp)
+(
+  pid=$(gcloud config get project 2> /dev/null)
+  pnum=$(gcloud projects describe "$pid" --format="value(projectNumber)" 2> /dev/null)
+  gcloud config set project "$pid" > /dev/null 2>&1
+  printf 'project_id=%q\nproject_num=%q\n' "$pid" "$pnum"
+) > "$gcloud_info" 2> /dev/null &
+wait_with_dots $! || true
+# shellcheck disable=SC1090
+. "$gcloud_info"
+rm -f "$gcloud_info"
+if [ -z "$project_id" ]; then
+  echo " 失敗"
+  cat <<EOS
+
+[ERROR] Google Cloud のプロジェクトを取得できませんでした。
+        下記で対象を指定してから、もう一度お試しください。
+
+  gcloud config set project <プロジェクト ID>
+
+EOS
+  exit 1
+fi
+echo " 完了"
 
 # A stopped instance has no external IP, so an empty value is also a failure.
 external_ip=$(gcloud compute instances describe "$SERVER_NAME" --zone="$ZONE" \
@@ -90,16 +116,17 @@ else
   echo "OS の更新はありません。"
 fi
 
-echo -n "  更新中 ... "
+echo -n "  更新中 "
 
 # The image turns SIGTERM into a clean `stop`, but the shutdown sequence is
 # less forgiving than `docker stop`, so stop the container explicitly first.
 # The connection drops as the instance goes down, so ssh reports failure here;
 # wait_for_server below is what actually confirms the outcome.
 gcloud compute ssh --quiet --zone "$ZONE" "$SERVER_NAME" \
-  --command="docker stop -t 60 mc-server && sudo reboot" > /dev/null 2>&1 || true
+  --command="docker stop -t 60 mc-server && sudo reboot" > /dev/null 2>&1 &
+wait_with_dots $! || true
 
-echo "完了"
+echo " 完了"
 echo ""
 echo -n "マインクラフト再起動中 "
 

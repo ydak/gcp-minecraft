@@ -94,17 +94,27 @@ trap 'rm -rf "$work_dir"' EXIT
 # Minecraft server, so they are kept out of the way unless a specific ref was
 # asked for, in which case showing it is how that choice gets confirmed.
 if [ "$REF" == "main" ]; then
-  echo -n "準備中 ... "
+  echo -n "準備中 "
 else
-  echo -n "準備中 (${REF}) ... "
+  echo -n "準備中 (${REF}) "
 fi
 
 # pipefail is scoped to this subshell so that a failed download is caught here
-# rather than being masked by tar's exit status.
-if ! (set -o pipefail
-      curl -fsSL "https://codeload.github.com/${REPO}/tar.gz/${REF}" \
-        | tar xz -C "$work_dir" --strip-components=1) > /dev/null 2>&1; then
-  echo "失敗"
+# rather than being masked by tar's exit status. functions.sh is not available
+# yet, so the dot loop is written out rather than calling wait_with_dots.
+(set -o pipefail
+ curl -fsSL "https://codeload.github.com/${REPO}/tar.gz/${REF}" \
+   | tar xz -C "$work_dir" --strip-components=1) > /dev/null 2>&1 &
+download_pid=$!
+while kill -0 "$download_pid" 2> /dev/null; do
+  echo -n "."
+  sleep 1
+done
+download_status=0
+wait "$download_pid" || download_status=$?
+
+if [ "$download_status" -ne 0 ]; then
+  echo " 失敗"
   cat <<EOS
 
 [ERROR] 必要なファイルを取得できませんでした。
@@ -114,7 +124,7 @@ if ! (set -o pipefail
 EOS
   exit 1
 fi
-echo "完了"
+echo " 完了"
 
 # shellcheck source=functions.sh
 . "${work_dir}/functions.sh"

@@ -12,11 +12,37 @@ BACKUP_DIR="$HOME"
 echo "==================== ワールドの復元 ===================="
 
 # GOOGLE CLOUD ==========
-echo -n "確認中 ... "
-project_id=$(gcloud config get project 2> /dev/null)
-project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
-gcloud config set project "$project_id" > /dev/null 2>&1
-echo "完了"
+# Run in the background so the dots reflect real elapsed time rather than
+# being three characters printed up front.
+# Declared up front: they are assigned by sourcing the file the subshell
+# writes, which neither shellcheck nor set -e can see into.
+project_id=""
+project_num=""
+echo -n "確認中 "
+gcloud_info=$(mktemp)
+(
+  pid=$(gcloud config get project 2> /dev/null)
+  pnum=$(gcloud projects describe "$pid" --format="value(projectNumber)" 2> /dev/null)
+  gcloud config set project "$pid" > /dev/null 2>&1
+  printf 'project_id=%q\nproject_num=%q\n' "$pid" "$pnum"
+) > "$gcloud_info" 2> /dev/null &
+wait_with_dots $! || true
+# shellcheck disable=SC1090
+. "$gcloud_info"
+rm -f "$gcloud_info"
+if [ -z "$project_id" ]; then
+  echo " 失敗"
+  cat <<EOS
+
+[ERROR] Google Cloud のプロジェクトを取得できませんでした。
+        下記で対象を指定してから、もう一度お試しください。
+
+  gcloud config set project <プロジェクト ID>
+
+EOS
+  exit 1
+fi
+echo " 完了"
 
 # A stopped instance has no external IP, so an empty value is also a failure.
 external_ip=$(gcloud compute instances describe "$SERVER_NAME" --zone="$ZONE" \
@@ -101,9 +127,13 @@ fi
 backup_file="${backups[$backup_num - 1]}"
 
 # Check the archive here rather than after the world has been replaced.
-echo -n "  データの検証中 ... "
-if ! tar tzf "$backup_file" > /dev/null 2>&1; then
-  echo "失敗"
+echo -n "  データの検証中 "
+tar tzf "$backup_file" > /dev/null 2>&1 &
+verify_status=0
+wait_with_dots $! || verify_status=$?
+
+if [ "$verify_status" -ne 0 ]; then
+  echo " 失敗"
   echo "[ERROR] $(basename "$backup_file") は壊れています。"
   exit 1
 fi

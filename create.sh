@@ -10,14 +10,42 @@ script_dir=$(dirname "${0}")
 echo "==================== Minecraft サーバーの作成 ===================="
 
 # GOOGLE CLOUD ==========
-echo -n "確認中 ... "
-project_id=$(gcloud config get project 2> /dev/null)
+# Run in the background so the dots reflect real elapsed time rather than being
+# three characters printed up front.
+#
 # NOTE: `gcloud projects list --filter="$project_id"` is a bare-word filter that
 #       matches ANY field. A similarly named project makes it return multiple
-#       lines, which silently corrupts the service account name below.
-project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
-gcloud config set project "$project_id" > /dev/null 2>&1
-echo "完了"
+#       lines, which silently corrupts the service account name below, so
+#       describe is used instead.
+# Declared up front: they are assigned by sourcing the file the subshell
+# writes, which neither shellcheck nor set -e can see into.
+project_id=""
+project_num=""
+echo -n "確認中 "
+gcloud_info=$(mktemp)
+(
+  pid=$(gcloud config get project 2> /dev/null)
+  pnum=$(gcloud projects describe "$pid" --format="value(projectNumber)" 2> /dev/null)
+  gcloud config set project "$pid" > /dev/null 2>&1
+  printf 'project_id=%q\nproject_num=%q\n' "$pid" "$pnum"
+) > "$gcloud_info" 2> /dev/null &
+wait_with_dots $! || true
+# shellcheck disable=SC1090
+. "$gcloud_info"
+rm -f "$gcloud_info"
+if [ -z "$project_id" ]; then
+  echo " 失敗"
+  cat <<EOS
+
+[ERROR] Google Cloud のプロジェクトを取得できませんでした。
+        下記で対象を指定してから、もう一度お試しください。
+
+  gcloud config set project <プロジェクト ID>
+
+EOS
+  exit 1
+fi
+echo " 完了"
 
 cat <<EOS
 
