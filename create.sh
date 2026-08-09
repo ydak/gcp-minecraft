@@ -47,29 +47,11 @@ EOS
 fi
 echo " 完了"
 
-cat <<EOS
-
--*-*-*-*- [GOOGLE CLOUD (Google Cloud の情報確認)] -*-*-*-*-
-プロジェクト ID  : $project_id
-プロジェクト番号 : $project_num
-
-上記の Google Cloud 環境でマインクラフトサーバーを作成します。
-
-・今回作成する Minecraft サーバーの無料枠は、 1 Google Cloud アカウントにつき 1 台までです。
-・すでに起動中のサーバーが別にある場合、2 台目は無料枠の対象外となり、
-　VM と外部 IP を合わせておおよそ毎月 10 ドル (1,500 円ほど) かかります。
-・以前のサーバーを削除済みであれば料金はかかりません。停止中の場合も
-　稼働時間は消費しません。無料枠は台数ではなく稼働時間で計算されるためです。
-EOS
-
-echo -n "よろしいですか? [y/N]: "
-read -r gcp_info
-if [ "$gcp_info" != "y" ]; then exit 1 ; fi
-
 # EXISTING SERVER ==========
-# Checked before any of the questions below. Creating a second instance fails at
-# the very end otherwise, after every setting has been typed in, and the free
-# tier only covers one instance anyway.
+# Checked before the questions below, and before the notice that follows:
+# creating a second instance fails at the very end otherwise, after every
+# setting has been typed in, and asking someone to confirm a warning about a
+# second server only to then refuse to build one reads as a contradiction.
 existing=$(gcloud compute instances describe minecraft --zone=us-west1-b \
   --format="value(status,networkInterfaces[0].accessConfigs[0].natIP)" 2>/dev/null || true)
 
@@ -103,6 +85,26 @@ backup を実行してください。
 EOS
   exit 1
 fi
+
+# The check above only covers this project, but the free tier is counted per
+# billing account, so an instance in another project is the one case it cannot
+# see. That is all this notice is for.
+cat <<EOS
+
+-*-*-*-*- [GOOGLE CLOUD (Google Cloud の情報確認)] -*-*-*-*-
+プロジェクト ID  : $project_id
+プロジェクト番号 : $project_num
+
+上記の Google Cloud 環境でマインクラフトサーバーを作成します。
+
+・無料枠で動かせるサーバーは、Google Cloud アカウント全体で 1 台までです。
+　他のプロジェクトでサーバーを動かしている場合、こちらは無料枠の対象外となり、
+　VM と外部 IP を合わせておおよそ毎月 10 ドル (1,500 円ほど) かかります。
+EOS
+
+echo -n "よろしいですか? [y/N]: "
+read -r gcp_info
+if [ "$gcp_info" != "y" ]; then exit 1 ; fi
 
 # SERVER NAME ==========
 cat <<EOS
