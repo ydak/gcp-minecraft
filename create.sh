@@ -328,30 +328,7 @@ trap 'rm -f "$startup_script"' EXIT
 #   - the wrapper image is pulled again here
 #   - the Bedrock binary is fetched when the container starts (VERSION=LATEST)
 # update.sh reboots the instance, which is what drives all three.
-cat > "$startup_script" <<EOS
-#!/bin/bash
-mkdir -p /var/minecraft
-cd /var/minecraft/ || exit 1
-docker volume create mc-volume
-
-# The Bedrock binary is downloaded at container start and is always current,
-# but it runs against the libraries baked into this image. Pinning the image
-# would leave those to age, so pull it again on every boot.
-#
-# Pull first and replace the container only if that succeeded: a failed pull
-# then leaves the running container untouched.
-if docker pull itzg/minecraft-bedrock-server:latest; then
-  # --restart=always may have started the old container already. Stop it
-  # gracefully first. The image turns SIGTERM into a clean 'stop', while
-  # removing it outright can leave the world half written.
-  docker stop -t 60 mc-server > /dev/null 2>&1
-  docker rm -f mc-server > /dev/null 2>&1
-fi
-
-if ! docker inspect mc-server > /dev/null 2>&1; then
-  docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=${server_name:-ydak} -e GAMEMODE=${game_mode:-survival} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e ALLOW_LIST=false -e MAX_PLAYERS=${max_players:-2} -e VIEW_DISTANCE=10 -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e LEVEL_SEED=$seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
-fi
-EOS
+render_startup_script "$startup_script"
 
 # gcloud writes the created resource URL and any warnings to stderr. Capture it
 # so the run stays readable, and print it only if the creation actually failed.
