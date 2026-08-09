@@ -11,7 +11,7 @@ SERVER_NAME=minecraft
 echo "==================== Minecraft の更新 ===================="
 
 # GOOGLE CLOUD ==========
-echo -n "確認しています ... "
+echo -n "確認中 ... "
 project_id=$(gcloud config get project)
 project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
 gcloud config set project "$project_id" > /dev/null
@@ -81,7 +81,7 @@ else
   echo "OS の更新はありません。"
 fi
 
-echo -n "  更新しています ... "
+echo -n "  更新中 ... "
 
 # The image turns SIGTERM into a clean `stop`, but the shutdown sequence is
 # less forgiving than `docker stop`, so stop the container explicitly first.
@@ -92,7 +92,7 @@ gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" \
 
 echo "完了"
 echo ""
-echo -n "マインクラフトの再起動を待っています "
+echo -n "マインクラフト再起動中 "
 
 if wait_for_server "$external_ip" 900; then
   cat <<EOS

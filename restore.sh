@@ -12,7 +12,7 @@ BACKUP_DIR="$HOME"
 echo "==================== ワールドの復元 ===================="
 
 # GOOGLE CLOUD ==========
-echo -n "確認しています ... "
+echo -n "確認中 ... "
 project_id=$(gcloud config get project)
 project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
 gcloud config set project "$project_id" > /dev/null
@@ -101,7 +101,7 @@ fi
 backup_file="${backups[$backup_num - 1]}"
 
 # Check the archive here rather than after the world has been replaced.
-echo -n "  データの検証 ... "
+echo -n "  データの検証中 ... "
 if ! tar tzf "$backup_file" > /dev/null 2>&1; then
   echo "失敗"
   echo "[ERROR] $(basename "$backup_file") は壊れています。"
@@ -130,10 +130,10 @@ read -r restore_yn
 if [ "$restore_yn" != "y" ]; then exit 1 ; fi
 
 echo ""
-run_step "サーバーの停止" \
+run_step "サーバーの停止中" \
   gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="docker stop -t 60 mc-server"
 
-echo -n "  ワールドの書き戻し ... "
+echo -n "  ワールドの書き戻し中 ... "
 
 # The archive is expanded into a scratch directory first and the current world
 # is only moved aside once that has succeeded. A truncated upload therefore
@@ -168,11 +168,11 @@ EOS
 fi
 
 echo "完了"
-run_step "サーバーの再開" \
+run_step "サーバーの再開中" \
   gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="docker start mc-server"
 
 echo ""
-echo -n "マインクラフトの再開を待っています "
+echo -n "マインクラフト再開中 "
 
 if wait_for_server "$external_ip" 900; then
   cat <<EOS

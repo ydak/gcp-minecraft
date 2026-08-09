@@ -10,7 +10,7 @@ script_dir=$(dirname "${0}")
 echo "==================== Minecraft サーバーの作成 ===================="
 
 # GOOGLE CLOUD ==========
-echo -n "確認しています ... "
+echo -n "確認中 ... "
 project_id=$(gcloud config get project)
 # NOTE: `gcloud projects list --filter="$project_id"` is a bare-word filter that
 #       matches ANY field. A similarly named project makes it return multiple
@@ -149,7 +149,7 @@ EOS
 #       The output is captured rather than shown: it is a progress spinner and
 #       an operation id, neither of which is worth reading unless it fails.
 enable_log=$(mktemp)
-echo -n "  Google Cloud の準備 "
+echo -n "  Google Cloud の準備中 "
 for i in 1 2 3 4 5; do
   gcloud services enable compute.googleapis.com > "$enable_log" 2>&1 &
   enable_status=0
@@ -212,7 +212,7 @@ echo " 完了"
 fw_minecraft=$(gcloud compute firewall-rules list --format="json" | jq -r '.[] | select(.name=="minecraft")')
 
 if [ -z "$fw_minecraft" ]; then
-  run_step "ネットワークの設定" \
+  run_step "ネットワークの設定中" \
     gcloud compute --project="$project_id" \
     firewall-rules create minecraft \
     --description=minecraft \
@@ -287,7 +287,7 @@ EOS
 # here rather than being masked by jq's exit status.
 create_log=$(mktemp)
 create_out=$(mktemp)
-echo -n "  サーバーの作成 "
+echo -n "  サーバーの作成中 "
 
 gcloud compute instances create minecraft \
   --format="json" \
@@ -332,7 +332,7 @@ echo " 完了"
 # generated. Probe UDP 19132 from here until the server actually answers,
 # so the script does not report success before you can join.
 echo ""
-echo -n "マインクラフトの起動を待っています "
+echo -n "マインクラフト起動中 "
 
 ping_info=$(mktemp)
 

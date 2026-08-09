@@ -94,9 +94,9 @@ trap 'rm -rf "$work_dir"' EXIT
 # Minecraft server, so they are kept out of the way unless a specific ref was
 # asked for, in which case showing it is how that choice gets confirmed.
 if [ "$REF" == "main" ]; then
-  echo -n "準備しています ... "
+  echo -n "準備中 ... "
 else
-  echo -n "準備しています (${REF}) ... "
+  echo -n "準備中 (${REF}) ... "
 fi
 
 # pipefail is scoped to this subshell so that a failed download is caught here

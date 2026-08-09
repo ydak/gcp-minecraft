@@ -12,7 +12,7 @@ BACKUP_DIR="$HOME"
 echo "==================== ワールドのバックアップ ===================="
 
 # GOOGLE CLOUD ==========
-echo -n "確認しています ... "
+echo -n "確認中 ... "
 project_id=$(gcloud config get project)
 project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
 gcloud config set project "$project_id" > /dev/null
@@ -69,10 +69,10 @@ backup_file="${BACKUP_DIR}/minecraft-backup-${timestamp}.tar.gz"
 # directory, so archiving it mid-write can produce a backup that does not
 # restore. The image turns SIGTERM into a clean `stop`.
 echo ""
-run_step "サーバーの停止" \
+run_step "サーバーの停止中" \
   gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="docker stop -t 60 mc-server"
 
-echo -n "  ワールドの取得 ... "
+echo -n "  ワールドの取得中 ... "
 
 # busybox is a couple of megabytes and is guaranteed to carry tar and sh, so it
 # is used rather than reaching into the volume's host path, which would need
@@ -89,12 +89,12 @@ if ! gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" \
 fi
 
 echo "完了"
-run_step "サーバーの再開" \
+run_step "サーバーの再開中" \
   gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" --command="docker start mc-server"
 
 # Reading the archive back decompresses every entry and checks the gzip CRC, so
 # this catches a truncated or corrupted transfer before it is trusted.
-echo -n "  データの検証 ... "
+echo -n "  データの検証中 ... "
 if ! tar tzf "$backup_file" > /dev/null 2>&1; then
   rm -f "$backup_file"
   echo "失敗"
@@ -119,7 +119,7 @@ else
 fi
 
 echo ""
-echo -n "マインクラフトの再開を待っています "
+echo -n "マインクラフト再開中 "
 
 if wait_for_server "$external_ip" 900; then
   cat <<EOS
