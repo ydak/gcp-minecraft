@@ -19,7 +19,7 @@ REPO="ydak/gcp-minecraft"
 REF="${REF:-main}"
 ACTION="${1:-}"
 
-action_list=(create update backup restore delete)
+action_list=(create update config backup restore delete)
 
 usage() {
   cat <<EOS
@@ -32,6 +32,7 @@ Then pick what to do from the menu.
 
   create   Create a Minecraft server (マインクラフトサーバーを作成)
   update   Update Minecraft and the host (マインクラフトとホストを更新)
+  config   Change server settings (マインクラフトの設定を変更)
   backup   Save the world to CloudShell (ワールドデータをバックアップ)
   restore  Put a saved world back (ワールドデータを復元)
   delete   Delete the server (マインクラフトサーバーを削除)
@@ -48,7 +49,7 @@ EOS
 }
 
 case "$ACTION" in
-  "" | create | update | backup | restore | delete) ;;
+  "" | create | update | config | backup | restore | delete) ;;
   -h | --help | help)
     usage
     exit 0
@@ -85,7 +86,9 @@ if [ -c /dev/tty ] && (: < /dev/tty) 2> /dev/null; then
   tty_available=1
 fi
 
+echo ""
 echo "==================== Minecraft サーバー管理 ===================="
+echo ""
 
 work_dir=$(mktemp -d)
 trap 'rm -rf "$work_dir"' EXIT
@@ -143,16 +146,18 @@ if [ "$ACTION" == "" ]; then
   cat <<EOS
 
 -*-*-*-*- [ACTION (操作を選択)] -*-*-*-*-
+
 [1] create  (マインクラフトサーバーを作成)
 [2] update  (マインクラフトとホストを更新)
-[3] backup  (ワールドデータをバックアップ)
-[4] restore (ワールドデータを復元)
-[5] delete  (マインクラフトサーバーを削除)
+[3] config  (マインクラフトの設定を変更)
+[4] backup  (ワールドデータをバックアップ)
+[5] restore (ワールドデータを復元)
+[6] delete  (マインクラフトサーバーを削除)
 EOS
   echo -n "Select action (Default: 1): "
   read -r action_num < /dev/tty
   if [ "$action_num" == "" ]; then action_num=1 ; fi
-  num_validation "$action_num" 5
+  num_validation "$action_num" 6
   ACTION=${action_list[$action_num-1]}
 fi
 

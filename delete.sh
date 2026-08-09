@@ -7,7 +7,9 @@ script_dir=$(dirname "${0}")
 # shellcheck source=const.sh
 . "$script_dir/const.sh"
 
+echo ""
 echo "==================== Minecraft サーバーの削除 ===================="
+echo ""
 
 # GOOGLE CLOUD ==========
 # Run in the background so the dots reflect real elapsed time rather than being
@@ -48,6 +50,7 @@ FIREWALL_RULE_NAME=minecraft
 cat <<EOS
 
 -*-*-*-*- [削除対象の確認] -*-*-*-*-
+
 プロジェクト ID
 　$project_id
 プロジェクト番号

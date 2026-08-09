@@ -1,4 +1,84 @@
 ################################################################################
+# Writes the instance startup script to the given path.
+#
+# The settings live in the instance metadata rather than in server.properties,
+# because the image rewrites server.properties from these environment variables
+# on every container start. Editing the file directly is undone by the next
+# restart; changing this script and rebooting is what actually sticks.
+#
+# create.sh and config.sh both go through here so that a settings change cannot
+# drift from what a fresh build would produce.
+#
+# Reads: server_name, game_mode, difficulty, allow_cheat, max_players,
+#        view_distance, permission, seed, and the advanced settings below.
+#
+# Every setting carries a default here, so create.sh can leave the advanced ones
+# alone and config.sh can still change them later without the two drifting.
+#
+# The defaults are Minecraft's own except for two, which are set for the free
+# tier: VIEW_DISTANCE (32 -> 5) and PLAYER_IDLE_TIMEOUT (30 -> 5). Both bound
+# outbound traffic, which is what the 1 GB monthly allowance runs out of first.
+#
+# Those two are the only ones left to set. Everything else that moves traffic
+# already ships at its cheapest value: TICK_DISTANCE is at the bottom of its
+# 4-12 range, CLIENT_SIDE_CHUNK_GENERATION_ENABLED already hands terrain
+# generation to the client, COMPRESSION_THRESHOLD of 1 already compresses
+# everything, COMPRESSION_ALGORITHM is zlib rather than the weaker-compressing
+# snappy, and EMIT_SERVER_TELEMETRY is off. None are set here, so that they
+# follow Minecraft rather than freezing today's value.
+#
+# Arguments:
+#   1: Path to write to
+# Returns:
+#   None
+################################################################################
+function render_startup_script() {
+  local out=$1
+
+  # Most settings come from a fixed menu or are checked as numbers, but the
+  # server name, the seed and the allow list are typed in freely, and a
+  # Minecraft gamertag may well contain a space. Unquoted, a space splits the
+  # docker run arguments and the stray word is taken as the image name, so the
+  # container silently never starts. Quote those three for the generated script.
+  local q_server_name q_seed q_allow_list_users
+  # shellcheck disable=SC2154
+  printf -v q_server_name '%q' "${server_name:-ydak}"
+  # shellcheck disable=SC2154
+  printf -v q_seed '%q' "${seed:-}"
+  # shellcheck disable=SC2154
+  printf -v q_allow_list_users '%q' "${allow_list_users:-}"
+
+  # The remaining settings are read from the caller's scope rather than passed
+  # in: there are sixteen of them, and positional arguments would be easy to
+  # transpose.
+  # shellcheck disable=SC2154
+  cat > "$out" <<EOS
+#!/bin/bash
+mkdir -p /var/minecraft
+cd /var/minecraft/ || exit 1
+docker volume create mc-volume
+
+# The Bedrock binary is downloaded at container start and is always current,
+# but it runs against the libraries baked into this image. Pinning the image
+# would leave those to age, so pull it again on every boot.
+#
+# Pull first and replace the container only if that succeeded: a failed pull
+# then leaves the running container untouched.
+if docker pull itzg/minecraft-bedrock-server:latest; then
+  # --restart=always may have started the old container already. Stop it
+  # gracefully first. The image turns SIGTERM into a clean 'stop', while
+  # removing it outright can leave the world half written.
+  docker stop -t 60 mc-server > /dev/null 2>&1
+  docker rm -f mc-server > /dev/null 2>&1
+fi
+
+if ! docker inspect mc-server > /dev/null 2>&1; then
+  docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=$q_server_name -e GAMEMODE=${game_mode:-survival} -e FORCE_GAMEMODE=${force_gamemode:-false} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e ALLOW_LIST=${allow_list:-false} -e ALLOW_LIST_USERS=$q_allow_list_users -e MAX_PLAYERS=${max_players:-2} -e VIEW_DISTANCE=${view_distance:-5} -e TICK_DISTANCE=${tick_distance:-4} -e PLAYER_IDLE_TIMEOUT=${player_idle_timeout:-5} -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e CHAT_RESTRICTION=${chat_restriction:-None} -e DISABLE_PLAYER_INTERACTION=${disable_player_interaction:-false} -e TEXTUREPACK_REQUIRED=${texturepack_required:-false} -e DISABLE_CUSTOM_SKINS=${disable_custom_skins:-false} -e LEVEL_SEED=$q_seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
+fi
+EOS
+}
+
+################################################################################
 # Prints a dot a second until the given process exits.
 #
 # Arguments:
@@ -134,6 +214,49 @@ function positive_num_validation() {
     echo "[ERROR] Enter a number of 1 or more. (1 以上の数字を入力して下さい。)"
     exit 1
   fi
+}
+
+################################################################################
+# Normalizes a comma separated allow list, dropping empty entries and the
+# spaces around each one. Only the surrounding spaces go: a gamertag may itself
+# contain one.
+#
+# An entry is either a bare gamertag or 'gamertag:xuid'. The image picks
+# between the two by looking for a colon anywhere in the whole string, not per
+# entry, so one entry in the second form turns every entry in the first form
+# into a null xuid and those players stop matching. Mixing the two is refused
+# here rather than producing an allow list that silently omits people.
+#
+# Arguments:
+#   1: The list as typed
+# Returns:
+#   0 and prints the normalized list, or 1 if the two forms are mixed
+################################################################################
+function normalize_allow_list_users() {
+  local raw=$1
+  local -a entries
+  local entry out="" total=0 with_xuid=0
+
+  # read -a rather than word splitting on IFS: an unquoted expansion would also
+  # expand a gamertag containing '*' against the file system.
+  IFS=',' read -r -a entries <<< "$raw"
+
+  for entry in "${entries[@]}"; do
+    entry="${entry#"${entry%%[![:space:]]*}"}"
+    entry="${entry%"${entry##*[![:space:]]}"}"
+    if [ -z "$entry" ]; then continue ; fi
+
+    total=$((total + 1))
+    case "$entry" in *:*) with_xuid=$((with_xuid + 1)) ;; esac
+
+    if [ -z "$out" ]; then out=$entry ; else out="${out},${entry}" ; fi
+  done
+
+  if [ "$with_xuid" -ne 0 ] && [ "$with_xuid" -ne "$total" ]; then
+    return 1
+  fi
+
+  echo "$out"
 }
 
 ################################################################################

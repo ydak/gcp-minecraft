@@ -7,7 +7,9 @@ script_dir=$(dirname "${0}")
 # shellcheck source=const.sh
 . "$script_dir/const.sh"
 
+echo ""
 echo "==================== Minecraft サーバーの作成 ===================="
+echo ""
 
 # GOOGLE CLOUD ==========
 # Run in the background so the dots reflect real elapsed time rather than being
@@ -47,29 +49,11 @@ EOS
 fi
 echo " 完了"
 
-cat <<EOS
-
--*-*-*-*- [GOOGLE CLOUD (Google Cloud の情報確認)] -*-*-*-*-
-プロジェクト ID  : $project_id
-プロジェクト番号 : $project_num
-
-上記の Google Cloud 環境でマインクラフトサーバーを作成します。
-
-・今回作成する Minecraft サーバーの無料枠は、 1 Google Cloud アカウントにつき 1 台までです。
-・すでに起動中のサーバーが別にある場合、2 台目は無料枠の対象外となり、
-　VM と外部 IP を合わせておおよそ毎月 10 ドル (1,500 円ほど) かかります。
-・以前のサーバーを削除済みであれば料金はかかりません。停止中の場合も
-　稼働時間は消費しません。無料枠は台数ではなく稼働時間で計算されるためです。
-EOS
-
-echo -n "よろしいですか? [y/N]: "
-read -r gcp_info
-if [ "$gcp_info" != "y" ]; then exit 1 ; fi
-
 # EXISTING SERVER ==========
-# Checked before any of the questions below. Creating a second instance fails at
-# the very end otherwise, after every setting has been typed in, and the free
-# tier only covers one instance anyway.
+# Checked before the questions below, and before the notice that follows:
+# creating a second instance fails at the very end otherwise, after every
+# setting has been typed in, and asking someone to confirm a warning about a
+# second server only to then refuse to build one reads as a contradiction.
 existing=$(gcloud compute instances describe minecraft --zone=us-west1-b \
   --format="value(status,networkInterfaces[0].accessConfigs[0].natIP)" 2>/dev/null || true)
 
@@ -104,10 +88,32 @@ EOS
   exit 1
 fi
 
+# The check above only covers this project, but the free tier is counted per
+# billing account, so an instance in another project is the one case it cannot
+# see. That is all this notice is for.
+cat <<EOS
+
+-*-*-*-*- [GOOGLE CLOUD (Google Cloud の情報確認)] -*-*-*-*-
+
+プロジェクト ID  : $project_id
+プロジェクト番号 : $project_num
+
+上記の Google Cloud 環境でマインクラフトサーバーを作成します。
+
+・無料枠で動かせるサーバーは、Google Cloud アカウント全体で 1 台までです。
+　他のプロジェクトでサーバーを動かしている場合、こちらは無料枠の対象外となり、
+　VM と外部 IP を合わせておおよそ毎月 10 ドル (1,500 円ほど) かかります。
+EOS
+
+echo -n "よろしいですか? [y/N]: "
+read -r gcp_info
+if [ "$gcp_info" != "y" ]; then exit 1 ; fi
+
 # SERVER NAME ==========
 cat <<EOS
 
 -*-*-*-*- [SERVER NAME (マインクラフトサーバー名を自由に決めて下さい)] -*-*-*-*-
+
 EOS
 echo -n "Server name (Default: ydak): "
 read -r server_name
@@ -116,6 +122,7 @@ read -r server_name
 cat <<EOS
 
 -*-*-*-*- [GAME MODE (ゲームモードを選択)] -*-*-*-*-
+
 [1] survival (サバイバル)
 [2] creative (クリエイティブ)
 [3] adventure (アドベンチャー)
@@ -130,6 +137,7 @@ game_mode=${game_mode_list[$game_mode_num-1]}
 cat <<EOS
 
 -*-*-*-*- [DIFFICULTY (難易度を選択)] -*-*-*-*-
+
 [1] peaceful (ピースフル)
 [2] easy (イージー)
 [3] normal (ノーマル)
@@ -145,6 +153,7 @@ difficulty=${difficulty_list[$difficulty_num-1]}
 cat <<EOS
 
 -*-*-*-*- [CHEAT (チートを有効にするかどうか)] -*-*-*-*-
+
 [1] ON (有効)
 [2] OFF (無効)
 EOS
@@ -158,6 +167,7 @@ allow_cheat=${allow_cheat_list[$allow_cheat_num-1]}
 cat <<EOS
 
 -*-*-*-*- [PERMISSION (サーバーに参加するユーザー全員の権限)] -*-*-*-*-
+
 [1] visitor (訪問者)
 [2] member (メンバー)
 [3] operator (管理者)
@@ -172,6 +182,7 @@ permission=${permission_num_list[$permission_num-1]}
 cat <<EOS
 
 -*-*-*-*- [MAX PLAYERS (同時に接続できる最大人数)] -*-*-*-*-
+
 無料枠の e2-micro はメモリが 1GB しかないため、3 人程度が実用上の上限です。
 それ以上で遊ぶ場合はマシンタイプの変更を検討して下さい。
 (The free tier e2-micro has only 1GB of memory, so around 3 players is the
@@ -190,6 +201,7 @@ fi
 cat <<EOS
 
 -*-*-*-*- [SEED (シード値を入力。入力しない場合はランダム)] -*-*-*-*-
+
 EOS
 echo -n "Seed (Default: random): "
 read -r seed
@@ -316,11 +328,14 @@ fi
 startup_script=$(mktemp)
 trap 'rm -f "$startup_script"' EXIT
 
-# VIEW_DISTANCE is set to 10 against a default of 32. Chunk data is the bulk of
-# what the server sends, so the default reaches much further than a 1GB RAM
-# shared-core instance can comfortably serve, in memory, CPU and outbound
-# traffic alike. Clients still render past this: client-side-chunk-generation is
-# on by default, so distant terrain is generated locally rather than sent.
+# VIEW_DISTANCE is set to 5 against a default of 32. Chunk data is the bulk of
+# what the server sends and it grows with the square of the radius, so this is
+# the largest single lever on outbound traffic, and the default reaches much
+# further than a 1GB RAM shared-core instance can comfortably serve in memory,
+# CPU and traffic alike. Clients still render past this:
+# client-side-chunk-generation is on by default, so distant terrain is
+# generated locally rather than sent. Raise it from config when the view
+# matters more than the allowance.
 #
 # This runs on every boot, so it is written to be idempotent and to refresh
 # what it can. A reboot is the single update mechanism for the whole stack:
@@ -328,30 +343,7 @@ trap 'rm -f "$startup_script"' EXIT
 #   - the wrapper image is pulled again here
 #   - the Bedrock binary is fetched when the container starts (VERSION=LATEST)
 # update.sh reboots the instance, which is what drives all three.
-cat > "$startup_script" <<EOS
-#!/bin/bash
-mkdir -p /var/minecraft
-cd /var/minecraft/ || exit 1
-docker volume create mc-volume
-
-# The Bedrock binary is downloaded at container start and is always current,
-# but it runs against the libraries baked into this image. Pinning the image
-# would leave those to age, so pull it again on every boot.
-#
-# Pull first and replace the container only if that succeeded: a failed pull
-# then leaves the running container untouched.
-if docker pull itzg/minecraft-bedrock-server:latest; then
-  # --restart=always may have started the old container already. Stop it
-  # gracefully first. The image turns SIGTERM into a clean 'stop', while
-  # removing it outright can leave the world half written.
-  docker stop -t 60 mc-server > /dev/null 2>&1
-  docker rm -f mc-server > /dev/null 2>&1
-fi
-
-if ! docker inspect mc-server > /dev/null 2>&1; then
-  docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=${server_name:-ydak} -e GAMEMODE=${game_mode:-survival} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e ALLOW_LIST=false -e MAX_PLAYERS=${max_players:-2} -e VIEW_DISTANCE=10 -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e LEVEL_SEED=$seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
-fi
-EOS
+render_startup_script "$startup_script"
 
 # gcloud writes the created resource URL and any warnings to stderr. Capture it
 # so the run stays readable, and print it only if the creation actually failed.
@@ -454,7 +446,8 @@ if wait_for_server "$external_ip" 900 "$ping_info"; then
  参加者の権限 : ${permission:-member}
  最大人数     : ${max_players:-2}
  シード値     : ${seed:-(ランダム)}
- 描画距離     : 10 チャンク (既定の 32 から下げています)
+ 描画距離     : 5 チャンク (既定の 32 から下げています)
+ 放置切断     : 5 分 (既定の 30 分から下げています)
 
 --------------------------------------------------------------------
  管理情報   ※ 自分用。共有する必要はありません
@@ -485,8 +478,7 @@ if wait_for_server "$external_ip" 900 "$ping_info"; then
  ・サーバーを停止・起動すると IP アドレスが変わります。
    再起動 (reboot) では変わりません。
  ・無料枠で動かせるサーバーは 1 台までです。
- ・下り通信は 1GB/月 まで無料です。超過分は約 \$0.12/GB です。
-   目安として 1 人が 1 時間遊ぶとおよそ 36MB です。
+ ・下り通信は 1GB/月 まで無料です。
 ====================================================================
 EOS
 

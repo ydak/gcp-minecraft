@@ -8,7 +8,9 @@ script_dir=$(dirname "${0}")
 ZONE=us-west1-b
 SERVER_NAME=minecraft
 
+echo ""
 echo "==================== Minecraft の更新 ===================="
+echo ""
 
 # GOOGLE CLOUD ==========
 # Run in the background so the dots reflect real elapsed time rather than
@@ -67,6 +69,7 @@ fi
 cat <<EOS
 
 -*-*-*-*- [更新対象の確認] -*-*-*-*-
+
 プロジェクト ID
 　$project_id
 プロジェクト番号
