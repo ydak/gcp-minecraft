@@ -343,8 +343,8 @@ EOS
 
   例: Steve, Alex 123
 
-大文字と小文字は区別されます。ゲーマータグは Minecraft の設定画面か、
-Xbox のプロフィールで確認できます。
+表示されているとおりに、大文字と小文字も含めて正確に入力してください。
+ゲーマータグは Minecraft のフレンド一覧か、Xbox のプロフィールで確認できます。
 EOS
     if [ -n "$allow_list_users" ]; then
       echo "現在の登録: ${allow_list_users}"
