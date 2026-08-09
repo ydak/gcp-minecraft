@@ -1,4 +1,44 @@
 ################################################################################
+# Prints a dot a second until the given process exits.
+#
+# Arguments:
+#   1: Process id to wait for
+# Returns:
+#   The exit status of that process
+################################################################################
+function wait_with_dots() {
+  local pid=$1
+  local status=0
+
+  while kill -0 "$pid" 2> /dev/null; do
+    echo -n "."
+    sleep 1
+  done
+
+  # The process has already gone, but bash keeps its status until it is reaped.
+  wait "$pid" || status=$?
+  return $status
+}
+
+################################################################################
+# Prints a dot a second for the given number of seconds.
+#
+# Arguments:
+#   1: Seconds to wait
+# Returns:
+#   None
+################################################################################
+function sleep_with_dots() {
+  local seconds=$1
+  local i
+
+  for ((i = 0; i < seconds; i++)); do
+    echo -n "."
+    sleep 1
+  done
+}
+
+################################################################################
 # Runs a command, showing a short label instead of its output.
 #
 # gcloud prints tables, resource URLs and progress spinners that mean nothing to
@@ -24,18 +64,23 @@ function run_step() {
     return $?
   fi
 
-  local log
+  local log status
   log=$(mktemp)
-  echo -n "  $label ... "
+  echo -n "  $label "
 
-  if "$@" > "$log" 2>&1; then
-    echo "完了"
+  # Run in the background so a dot can be printed every second. Some of these
+  # calls take minutes, and a screen that has not moved reads as a hang.
+  "$@" > "$log" 2>&1 &
+  status=0
+  wait_with_dots $! || status=$?
+
+  if [ "$status" -eq 0 ]; then
+    echo " 完了"
     rm -f "$log"
     return 0
   fi
 
-  local status=$?
-  echo "失敗"
+  echo " 失敗"
   echo ""
   echo "[ERROR] 処理に失敗しました。(The step above failed.)"
   echo "--------------------------------------------------------------------"
@@ -129,7 +174,10 @@ deadline = time.time() + int(sys.argv[2])
 info_path = sys.argv[3] if len(sys.argv) > 3 else ""
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.settimeout(1.0)
+# Kept under the one second tick so that the probe and the wait together still
+# land on a dot a second, rather than drifting out to two.
+sock.settimeout(0.8)
+next_tick = time.time()
 
 while time.time() < deadline:
     # ID_UNCONNECTED_PING: id(1) + time(8) + magic(16) + client guid(8)
@@ -164,7 +212,10 @@ while time.time() < deadline:
 
     sys.stdout.write(".")
     sys.stdout.flush()
-    time.sleep(1)
+    next_tick += 1.0
+    remaining = next_tick - time.time()
+    if remaining > 0:
+        time.sleep(remaining)
 
 print("")
 sys.exit(1)

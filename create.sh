@@ -149,17 +149,18 @@ EOS
 #       The output is captured rather than shown: it is a progress spinner and
 #       an operation id, neither of which is worth reading unless it fails.
 enable_log=$(mktemp)
-echo -n "  Google Cloud の準備 ... "
+echo -n "  Google Cloud の準備 "
 for i in 1 2 3 4 5; do
-  gcloud services enable compute.googleapis.com > "$enable_log" 2>&1
-  enable_status=$?
+  gcloud services enable compute.googleapis.com > "$enable_log" 2>&1 &
+  enable_status=0
+  wait_with_dots $! || enable_status=$?
   if [ "$enable_status" -eq 0 ]; then break; fi
 
   if [ "${MC_VERBOSE:-0}" == "1" ]; then cat "$enable_log"; fi
 
   if grep -qE 'billing-enabled|UREQ_PROJECT_BILLING_NOT_FOUND|Billing account for project' "$enable_log"; then
     rm -f "$enable_log"
-    echo "失敗"
+    echo " 失敗"
     cat <<EOS
 
 [ERROR] Billing is not enabled for this project.
@@ -178,15 +179,14 @@ EOS
     exit 1
   fi
 
-  echo -n "再試行しています ($i/5) "
-  sleep 70
+  sleep_with_dots 70
 done
 rm -f "$enable_log"
 
 if ! gcloud services list --enabled \
   --filter="config.name=compute.googleapis.com" \
   --format="value(config.name)" | grep -q .; then
-  echo "失敗"
+  echo " 失敗"
   cat <<EOS
 
 [ERROR] Google Cloud の準備に失敗しました。
@@ -204,9 +204,9 @@ for i in $(seq 1 20); do
     "$project_num-compute@developer.gserviceaccount.com" >/dev/null 2>&1; then
     break
   fi
-  sleep 15
+  sleep_with_dots 15
 done
-echo "完了"
+echo " 完了"
 
 # firewall =====================================================================
 fw_minecraft=$(gcloud compute firewall-rules list --format="json" | jq -r '.[] | select(.name=="minecraft")')
@@ -286,9 +286,10 @@ EOS
 # Splitting the call from the jq parse also means a gcloud failure is caught
 # here rather than being masked by jq's exit status.
 create_log=$(mktemp)
-echo -n "  サーバーの作成 ... "
+create_out=$(mktemp)
+echo -n "  サーバーの作成 "
 
-if ! create_json=$(gcloud compute instances create minecraft \
+gcloud compute instances create minecraft \
   --format="json" \
   --project="$project_id" \
   --zone=us-west1-b \
@@ -303,13 +304,18 @@ if ! create_json=$(gcloud compute instances create minecraft \
   --reservation-affinity=any \
   --metadata=cos-update-strategy=update_enabled \
   --metadata-from-file=startup-script="$startup_script" \
-  2> "$create_log"); then
-  echo "失敗"
+  > "$create_out" 2> "$create_log" &
+
+create_status=0
+wait_with_dots $! || create_status=$?
+
+if [ "$create_status" -ne 0 ]; then
+  echo " 失敗"
   echo ""
   echo "--------------------------------------------------------------------"
   cat "$create_log"
   echo "--------------------------------------------------------------------"
-  rm -f "$create_log"
+  rm -f "$create_log" "$create_out"
   exit 1
 fi
 
@@ -318,8 +324,9 @@ if [ "${MC_VERBOSE:-0}" == "1" ]; then
 fi
 rm -f "$create_log"
 
-external_ip=$(echo "$create_json" | jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP')
-echo "完了"
+external_ip=$(jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP' < "$create_out")
+rm -f "$create_out"
+echo " 完了"
 
 # The VM is up, but the container still has to be pulled and the world
 # generated. Probe UDP 19132 from here until the server actually answers,
