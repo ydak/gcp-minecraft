@@ -1,4 +1,100 @@
 ################################################################################
+# Prints a dot a second until the given process exits.
+#
+# Arguments:
+#   1: Process id to wait for
+# Returns:
+#   The exit status of that process
+################################################################################
+function wait_with_dots() {
+  local pid=$1
+  local status=0
+
+  # Start at three so the label never sits on its own for a moment, then add one
+  # a second from there.
+  echo -n "..."
+
+  while kill -0 "$pid" 2> /dev/null; do
+    echo -n "."
+    sleep 1
+  done
+
+  # The process has already gone, but bash keeps its status until it is reaped.
+  wait "$pid" || status=$?
+  return $status
+}
+
+################################################################################
+# Prints a dot a second for the given number of seconds.
+#
+# Arguments:
+#   1: Seconds to wait
+# Returns:
+#   None
+################################################################################
+function sleep_with_dots() {
+  local seconds=$1
+  local i
+
+  for ((i = 0; i < seconds; i++)); do
+    echo -n "."
+    sleep 1
+  done
+}
+
+################################################################################
+# Runs a command, showing a short label instead of its output.
+#
+# gcloud prints tables, resource URLs and progress spinners that mean nothing to
+# someone who just wants a Minecraft server, and a wall of them reads as
+# something having gone wrong. The output is captured and only printed when the
+# command fails, which is the point at which it becomes worth reading.
+#
+# Set MC_VERBOSE=1 to pass everything straight through instead.
+#
+# Arguments:
+#   1: Label shown to the user
+#   2+: Command to run
+# Returns:
+#   The exit status of the command
+################################################################################
+function run_step() {
+  local label=$1
+  shift
+
+  if [ "${MC_VERBOSE:-0}" == "1" ]; then
+    echo "  $label ..."
+    "$@"
+    return $?
+  fi
+
+  local log status
+  log=$(mktemp)
+  echo -n "  $label "
+
+  # Run in the background so a dot can be printed every second. Some of these
+  # calls take minutes, and a screen that has not moved reads as a hang.
+  "$@" > "$log" 2>&1 &
+  status=0
+  wait_with_dots $! || status=$?
+
+  if [ "$status" -eq 0 ]; then
+    echo " 完了"
+    rm -f "$log"
+    return 0
+  fi
+
+  echo " 失敗"
+  echo ""
+  echo "[ERROR] 処理に失敗しました。(The step above failed.)"
+  echo "--------------------------------------------------------------------"
+  cat "$log"
+  echo "--------------------------------------------------------------------"
+  rm -f "$log"
+  return $status
+}
+
+################################################################################
 # Receives a string and check if it is a specified number.
 # If it is not a valid number, exits with error code 1.
 #
@@ -50,12 +146,14 @@ function positive_num_validation() {
 # Arguments:
 #   1: External IP address of the server
 #   2: Timeout in seconds
+#   3: Optional path to write the answered details to, as shell assignments
 # Returns:
 #   0 if the server answered, 1 on timeout
 ################################################################################
 function wait_for_server() {
   local ip=$1
   local timeout=$2
+  local info_path=${3:-}
 
   if ! command -v python3 > /dev/null; then
     echo ""
@@ -64,7 +162,8 @@ function wait_for_server() {
     return 0
   fi
 
-  python3 - "$ip" "$timeout" <<'PYEOF'
+  python3 - "$ip" "$timeout" "$info_path" <<'PYEOF'
+import shlex
 import socket
 import struct
 import sys
@@ -76,9 +175,17 @@ PORT = 19132
 
 ip = sys.argv[1]
 deadline = time.time() + int(sys.argv[2])
+info_path = sys.argv[3] if len(sys.argv) > 3 else ""
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.settimeout(1.0)
+# Kept under the one second tick so that the probe and the wait together still
+# land on a dot a second, rather than drifting out to two.
+sock.settimeout(0.8)
+next_tick = time.time()
+
+# Same three-dot head start as wait_with_dots, so both read the same way.
+sys.stdout.write("...")
+sys.stdout.flush()
 
 while time.time() < deadline:
     # ID_UNCONNECTED_PING: id(1) + time(8) + magic(16) + client guid(8)
@@ -98,11 +205,25 @@ while time.time() < deadline:
             print("  Server name : %s" % fields[1])
             print("  Version     : %s" % fields[3])
             print("  Players     : %s/%s" % (fields[4], fields[5]))
+            # The MOTD is whatever the operator typed, so quote every value
+            # before it is sourced back into the shell.
+            if info_path:
+                lines = [
+                    "MC_NAME=" + shlex.quote(fields[1]),
+                    "MC_VERSION=" + shlex.quote(fields[3]),
+                    "MC_MAX_PLAYERS=" + shlex.quote(fields[5]),
+                    "",
+                ]
+                with open(info_path, "w", encoding="utf-8") as fh:
+                    fh.write(chr(10).join(lines))
         sys.exit(0)
 
     sys.stdout.write(".")
     sys.stdout.flush()
-    time.sleep(1)
+    next_tick += 1.0
+    remaining = next_tick - time.time()
+    if remaining > 0:
+        time.sleep(remaining)
 
 print("")
 sys.exit(1)

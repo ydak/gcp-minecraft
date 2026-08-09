@@ -8,13 +8,40 @@ script_dir=$(dirname "${0}")
 ZONE=us-west1-b
 SERVER_NAME=minecraft
 
-echo "==================== Start minecraft update ===================="
+echo "==================== Minecraft の更新 ===================="
 
 # GOOGLE CLOUD ==========
-echo -n "Setting Google Cloud info ..."
-project_id=$(gcloud config get project)
-project_num=$(gcloud projects describe "$project_id" --format="value(projectNumber)")
-gcloud config set project "$project_id"
+# Run in the background so the dots reflect real elapsed time rather than
+# being three characters printed up front.
+# Declared up front: they are assigned by sourcing the file the subshell
+# writes, which neither shellcheck nor set -e can see into.
+project_id=""
+project_num=""
+echo -n "確認中 "
+gcloud_info=$(mktemp)
+(
+  pid=$(gcloud config get project 2> /dev/null)
+  pnum=$(gcloud projects describe "$pid" --format="value(projectNumber)" 2> /dev/null)
+  gcloud config set project "$pid" > /dev/null 2>&1
+  printf 'project_id=%q\nproject_num=%q\n' "$pid" "$pnum"
+) > "$gcloud_info" 2> /dev/null &
+wait_with_dots $! || true
+# shellcheck disable=SC1090
+. "$gcloud_info"
+rm -f "$gcloud_info"
+if [ -z "$project_id" ]; then
+  echo " 失敗"
+  cat <<EOS
+
+[ERROR] Google Cloud のプロジェクトを取得できませんでした。
+        下記で対象を指定してから、もう一度お試しください。
+
+  gcloud config set project <プロジェクト ID>
+
+EOS
+  exit 1
+fi
+echo " 完了"
 
 # A stopped instance has no external IP, so an empty value is also a failure.
 external_ip=$(gcloud compute instances describe "$SERVER_NAME" --zone="$ZONE" \
@@ -71,36 +98,42 @@ if [ "$update_yn" != "y" ]; then exit 1 ; fi
 # Note that the first two only apply to instances created by a create.sh that
 # writes this startup script. On older instances the reboot still refreshes
 # Bedrock, and nothing breaks.
-echo "Checking for OS updates ..."
-os_status=$(gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" \
-  --command="sudo update_engine_client --status 2>/dev/null | grep CURRENT_OP" 2>/dev/null || true)
+# The first `gcloud compute ssh` in a fresh CloudShell generates an SSH key,
+# which takes long enough to look like a hang with no output at all.
+echo -n "  サーバーへ接続中 "
+os_out=$(mktemp)
+gcloud compute ssh --quiet --zone "$ZONE" "$SERVER_NAME" \
+  --command="sudo update_engine_client --status 2>/dev/null | grep CURRENT_OP" \
+  > "$os_out" 2>/dev/null &
+wait_with_dots $! || true
+os_status=$(cat "$os_out" 2>/dev/null || true)
+rm -f "$os_out"
+echo " 完了"
 
 if echo "$os_status" | grep -q "UPDATED_NEED_REBOOT"; then
-  echo "  An OS update is staged and will be applied by this reboot."
-  echo "  (OS の更新が準備済みです。この再起動で適用されます。)"
+  echo "OS の更新が見つかりました。あわせて適用します。"
 else
-  echo "  No OS update is staged."
-  echo "  (準備済みの OS 更新はありません。)"
+  echo "OS の更新はありません。"
 fi
 
-echo "Rebooting to update ..."
+echo -n "  更新中 "
 
 # The image turns SIGTERM into a clean `stop`, but the shutdown sequence is
 # less forgiving than `docker stop`, so stop the container explicitly first.
 # The connection drops as the instance goes down, so ssh reports failure here;
 # wait_for_server below is what actually confirms the outcome.
-gcloud compute ssh --zone "$ZONE" "$SERVER_NAME" \
-  --command="docker stop -t 60 mc-server && sudo reboot" > /dev/null 2>&1 || true
+gcloud compute ssh --quiet --zone "$ZONE" "$SERVER_NAME" \
+  --command="docker stop -t 60 mc-server && sudo reboot" > /dev/null 2>&1 &
+wait_with_dots $! || true
 
+echo " 完了"
 echo ""
-echo "Waiting for the Minecraft server to come back ..."
-echo -n "(マインクラフトサーバーの再起動を待っています) "
+echo -n "マインクラフト再起動中 "
 
 if wait_for_server "$external_ip" 900; then
   cat <<EOS
 
-Minecraft has been updated!
- (マインクラフトの更新が完了しました！)
+更新が完了しました！
 
 ################################################################################
 ${external_ip}
@@ -110,17 +143,14 @@ EOS
 else
   cat <<EOS
 
-[WARN] The server did not answer within 15 minutes.
-       (15分以内にサーバーが応答しませんでした。)
+[WARN] 15 分待ちましたが、サーバーが応答しませんでした。
 
-The container may still be downloading the new version.
-Check the log with the following command.
-(新しいバージョンを取得中の可能性があります。下記でログを確認して下さい。)
+新しいバージョンを取得している途中かもしれません。
+下記でログを確認できます。
 
-  gcloud compute ssh $SERVER_NAME --zone=$ZONE --command='docker logs mc-server | tail -30'
+  gcloud compute ssh --quiet $SERVER_NAME --zone=$ZONE --command='docker logs mc-server | tail -30'
 
 EOS
   exit 1
 fi
 
-echo "==================== End minecraft update ===================="
