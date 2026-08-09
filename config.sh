@@ -87,7 +87,31 @@ view_distance=$(current_of VIEW_DISTANCE)
 # The world already exists, so the seed cannot be changed. Carried through
 # unaltered so that regenerating the startup script does not drop it.
 seed=$(current_of LEVEL_SEED)
+
+# Advanced settings. Read even when they are not going to be edited: the
+# startup script is regenerated wholesale, so anything not carried over here
+# would silently revert to its default.
+force_gamemode=$(current_of FORCE_GAMEMODE)
+allow_list=$(current_of ALLOW_LIST)
+tick_distance=$(current_of TICK_DISTANCE)
+player_idle_timeout=$(current_of PLAYER_IDLE_TIMEOUT)
+chat_restriction=$(current_of CHAT_RESTRICTION)
+disable_player_interaction=$(current_of DISABLE_PLAYER_INTERACTION)
+texturepack_required=$(current_of TEXTUREPACK_REQUIRED)
+disable_custom_skins=$(current_of DISABLE_CUSTOM_SKINS)
 rm -f "$env_out"
+
+# A server built before these were added has no such variables, so fall back to
+# the same defaults render_startup_script would use.
+force_gamemode=${force_gamemode:-false}
+allow_list=${allow_list:-false}
+tick_distance=${tick_distance:-4}
+player_idle_timeout=${player_idle_timeout:-30}
+chat_restriction=${chat_restriction:-None}
+disable_player_interaction=${disable_player_interaction:-false}
+texturepack_required=${texturepack_required:-false}
+disable_custom_skins=${disable_custom_skins:-false}
+view_distance=${view_distance:-10}
 
 if [ -z "$server_name" ]; then
   echo " 失敗"
@@ -120,17 +144,42 @@ index_of() {
   echo 1
 }
 
+# The server stores these as true/false, but every menu below is phrased as
+# ON/OFF, so the listings are put in the same terms as the questions.
+on_off() {
+  if [ "$1" == "true" ]; then echo "ON" ; else echo "OFF" ; fi
+}
+
+# The before and after listings show the same fields. Printing them from one
+# place keeps a newly added setting from appearing in only one of the two,
+# which would hide it at exactly the moment the user is checking their work.
+print_settings() {
+  cat <<EOS
+サーバー名   : ${server_name}
+ゲームモード : ${game_mode}
+難易度       : ${difficulty}
+チート       : $(on_off "$allow_cheat")
+参加者の権限 : ${permission}
+最大人数     : ${max_players}
+描画距離     : ${view_distance}
+
+[詳細設定]
+シミュレーション距離   : ${tick_distance}
+放置切断の分数         : ${player_idle_timeout}
+ゲームモードの強制     : $(on_off "$force_gamemode")
+許可リスト             : $(on_off "$allow_list")
+チャット制限           : ${chat_restriction}
+プレイヤー干渉の無効化 : $(on_off "$disable_player_interaction")
+テクスチャパックの強制 : $(on_off "$texturepack_required")
+自作スキンの禁止       : $(on_off "$disable_custom_skins")
+EOS
+}
+
 cat <<EOS
 
 -*-*-*-*- [現在の設定] -*-*-*-*-
 プロジェクト : ${project_id} (${project_num})
-サーバー名   : ${server_name}
-ゲームモード : ${game_mode}
-難易度       : ${difficulty}
-チート       : ${allow_cheat}
-参加者の権限 : ${permission}
-最大人数     : ${max_players}
-描画距離     : ${view_distance}
+$(print_settings)
 
 変更したい項目だけ入力してください。
 そのまま Enter を押すと現在の値を保ちます。
@@ -240,16 +289,164 @@ if [ "$input" != "" ]; then
   view_distance=$input
 fi
 
+# ADVANCED ==========
+# Kept behind a prompt so the common case stays short. Everything here is
+# preserved untouched when skipped.
+cat <<EOS
+
+-*-*-*-*- [詳細設定] -*-*-*-*-
+ゲームモードの強制、許可リスト、放置切断、チャット制限などを変更できます。
+必要なければ、そのまま Enter で飛ばせます。
+EOS
+echo -n "詳細設定も変更しますか? [y/N]: "
+read -r advanced_yn
+
+if [ "$advanced_yn" == "y" ]; then
+  # FORCE GAMEMODE ==========
+  force_gamemode_default=$(index_of "$force_gamemode" "${bool_list[@]}")
+  cat <<EOS
+
+-*-*-*-*- [FORCE GAMEMODE (ゲームモードの強制)] -*-*-*-*-
+ON にすると、参加者が個別に設定していても、上のゲームモードを強制します。
+[1] ON (強制する)
+[2] OFF (各自の設定を尊重する)
+EOS
+  echo -n "Force gamemode? (Default: ${force_gamemode_default}): "
+  read -r input
+  if [ "$input" == "" ]; then input=$force_gamemode_default ; fi
+  num_validation "$input" 2
+  force_gamemode=${bool_list[$input-1]}
+
+  # ALLOW LIST ==========
+  allow_list_default=$(index_of "$allow_list" "${bool_list[@]}")
+  cat <<EOS
+
+-*-*-*-*- [ALLOW LIST (許可リスト)] -*-*-*-*-
+ON にすると、登録した人しか参加できなくなります。
+IP アドレスが漏れても他人が入れないため、安全性が上がります。
+[1] ON (登録した人だけ参加できる)
+[2] OFF (IP を知っていれば誰でも参加できる)
+EOS
+  echo -n "Allow list? (Default: ${allow_list_default}): "
+  read -r input
+  if [ "$input" == "" ]; then input=$allow_list_default ; fi
+  num_validation "$input" 2
+  allow_list=${bool_list[$input-1]}
+
+  if [ "$allow_list" == "true" ]; then
+    cat <<EOS
+
+[WARN] 許可リストを有効にすると、登録するまで誰も参加できなくなります。
+       自分を含め、参加する人を全員登録してください。
+
+  gcloud compute ssh --quiet $SERVER_NAME --zone=$ZONE \\
+    --command='docker exec mc-server send-command allowlist add "ゲーマータグ"'
+
+EOS
+  fi
+
+  # TICK DISTANCE ==========
+  cat <<EOS
+
+-*-*-*-*- [TICK DISTANCE (シミュレーション距離。単位はチャンク)] -*-*-*-*-
+プレイヤーから何チャンク先まで世界を動かすかです。
+大きくすると遠くの装置が動きますが、負荷が上がります。
+指定できるのは 4 から 12 です。
+EOS
+  echo -n "Tick distance (Default: ${tick_distance}): "
+  read -r input
+  if [ "$input" != "" ]; then
+    positive_num_validation "$input"
+    if [ "$input" -lt 4 ] || [ "$input" -gt 12 ]; then
+      echo "[ERROR] 4 から 12 の範囲で指定して下さい。"
+      exit 1
+    fi
+    tick_distance=$input
+  fi
+
+  # PLAYER IDLE TIMEOUT ==========
+  cat <<EOS
+
+-*-*-*-*- [PLAYER IDLE TIMEOUT (放置時の切断までの分数)] -*-*-*-*-
+操作しないまま指定の分数が過ぎると切断されます。
+0 を指定すると切断しません。放置による通信量を抑える効果があります。
+EOS
+  echo -n "Idle timeout (Default: ${player_idle_timeout}): "
+  read -r input
+  if [ "$input" != "" ]; then
+    if [[ ! ("$input" =~ ^[0-9]+$) ]]; then
+      echo "[ERROR] 0 以上の数字を入力して下さい。"
+      exit 1
+    fi
+    player_idle_timeout=$input
+  fi
+
+  # CHAT RESTRICTION ==========
+  chat_restriction_default=$(index_of "$chat_restriction" "${chat_restriction_list[@]}")
+  cat <<EOS
+
+-*-*-*-*- [CHAT RESTRICTION (チャットの制限)] -*-*-*-*-
+[1] None (制限しない)
+[2] Dropped (発言できるが誰にも届かない)
+[3] Disabled (チャット欄そのものを出さない)
+EOS
+  echo -n "Chat restriction (Default: ${chat_restriction_default}): "
+  read -r input
+  if [ "$input" == "" ]; then input=$chat_restriction_default ; fi
+  num_validation "$input" 3
+  chat_restriction=${chat_restriction_list[$input-1]}
+
+  # DISABLE PLAYER INTERACTION ==========
+  disable_player_interaction_default=$(index_of "$disable_player_interaction" "${bool_list[@]}")
+  cat <<EOS
+
+-*-*-*-*- [DISABLE PLAYER INTERACTION (プレイヤー同士の干渉を無効化)] -*-*-*-*-
+ON にすると、押し合いや攻撃などの相互作用が無くなります。
+[1] ON (干渉しない)
+[2] OFF (通常どおり)
+EOS
+  echo -n "Disable interaction? (Default: ${disable_player_interaction_default}): "
+  read -r input
+  if [ "$input" == "" ]; then input=$disable_player_interaction_default ; fi
+  num_validation "$input" 2
+  disable_player_interaction=${bool_list[$input-1]}
+
+  # TEXTUREPACK REQUIRED ==========
+  texturepack_required_default=$(index_of "$texturepack_required" "${bool_list[@]}")
+  cat <<EOS
+
+-*-*-*-*- [TEXTUREPACK REQUIRED (テクスチャパックの強制)] -*-*-*-*-
+ON にすると、サーバーのテクスチャパックの使用を参加者に強制します。
+[1] ON (強制する)
+[2] OFF (各自の設定を尊重する)
+EOS
+  echo -n "Texturepack required? (Default: ${texturepack_required_default}): "
+  read -r input
+  if [ "$input" == "" ]; then input=$texturepack_required_default ; fi
+  num_validation "$input" 2
+  texturepack_required=${bool_list[$input-1]}
+
+  # DISABLE CUSTOM SKINS ==========
+  disable_custom_skins_default=$(index_of "$disable_custom_skins" "${bool_list[@]}")
+  cat <<EOS
+
+-*-*-*-*- [DISABLE CUSTOM SKINS (自作スキンの禁止)] -*-*-*-*-
+ON にすると、外部で作られた自作スキンを使えなくします。
+不適切なスキンを防ぎたい場合に使います。
+[1] ON (禁止する)
+[2] OFF (許可する)
+EOS
+  echo -n "Disable custom skins? (Default: ${disable_custom_skins_default}): "
+  read -r input
+  if [ "$input" == "" ]; then input=$disable_custom_skins_default ; fi
+  num_validation "$input" 2
+  disable_custom_skins=${bool_list[$input-1]}
+fi
+
 cat <<EOS
 
 -*-*-*-*- [変更後の設定] -*-*-*-*-
-サーバー名   : ${server_name}
-ゲームモード : ${game_mode}
-難易度       : ${difficulty}
-チート       : ${allow_cheat}
-参加者の権限 : ${permission}
-最大人数     : ${max_players}
-描画距離     : ${view_distance}
+$(print_settings)
 
 この内容で設定を変更します。
 反映にはサーバーの再起動が必要なため、接続中のプレイヤーは全員切断されます。

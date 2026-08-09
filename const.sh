@@ -6,3 +6,8 @@ game_mode_list=(survival creative adventure)
 difficulty_list=(peaceful easy normal hard)
 allow_cheat_list=(true false)
 permission_num_list=(visitor member operator)
+
+# Used by the advanced settings, which are all either on/off or a small set of
+# named values.
+bool_list=(true false)
+chat_restriction_list=(None Dropped Disabled)
