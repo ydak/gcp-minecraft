@@ -93,6 +93,7 @@ seed=$(current_of LEVEL_SEED)
 # would silently revert to its default.
 force_gamemode=$(current_of FORCE_GAMEMODE)
 allow_list=$(current_of ALLOW_LIST)
+allow_list_users=$(current_of ALLOW_LIST_USERS)
 tick_distance=$(current_of TICK_DISTANCE)
 player_idle_timeout=$(current_of PLAYER_IDLE_TIMEOUT)
 chat_restriction=$(current_of CHAT_RESTRICTION)
@@ -167,7 +168,7 @@ print_settings() {
 シミュレーション距離   : ${tick_distance}
 放置切断の分数         : ${player_idle_timeout}
 ゲームモードの強制     : $(on_off "$force_gamemode")
-許可リスト             : $(on_off "$allow_list")
+許可リスト             : $(on_off "$allow_list")$(if [ "$allow_list" == "true" ]; then echo " (${allow_list_users:-未登録})" ; fi)
 チャット制限           : ${chat_restriction}
 プレイヤー干渉の無効化 : $(on_off "$disable_player_interaction")
 テクスチャパックの強制 : $(on_off "$texturepack_required")
@@ -336,13 +337,50 @@ EOS
   if [ "$allow_list" == "true" ]; then
     cat <<EOS
 
-[WARN] 許可リストを有効にすると、登録するまで誰も参加できなくなります。
-       自分を含め、参加する人を全員登録してください。
+-*-*-*-*- [ALLOW LIST USERS (参加を許可する人)] -*-*-*-*-
+参加する人のゲーマータグを、カンマ区切りで入力してください。
+自分を含め、参加する人を全員書いてください。ここに無い人は入れません。
 
-  gcloud compute ssh --quiet $SERVER_NAME --zone=$ZONE \\
-    --command='docker exec mc-server send-command allowlist add "ゲーマータグ"'
+  例: Steve, Alex 123
+
+大文字と小文字は区別されます。ゲーマータグは Minecraft の設定画面か、
+Xbox のプロフィールで確認できます。
+EOS
+    if [ -n "$allow_list_users" ]; then
+      echo "現在の登録: ${allow_list_users}"
+    fi
+    echo -n "Allowed players: "
+    read -r input
+    if [ "$input" != "" ]; then
+      if ! input=$(normalize_allow_list_users "$input"); then
+        cat <<EOS
+
+[ERROR] ゲーマータグだけの書き方と、XUID を付けた書き方が混ざっています。
+        どちらかに統一してください。
+
+  ゲーマータグだけ : Steve, Alex 123
+  XUID を付ける    : Steve:2535453759792258, Alex 123:2535465783925712
 
 EOS
+        exit 1
+      fi
+      allow_list_users=$input
+    fi
+
+    if [ -z "$allow_list_users" ]; then
+      cat <<EOS
+
+[ERROR] 一人も登録されていないため、このままでは誰も参加できなくなります。
+        参加する人のゲーマータグを入力してください。
+
+EOS
+      exit 1
+    fi
+  else
+    # The image forces the allow list back on whenever this is non-empty, so it
+    # has to be cleared for 'off' to take effect. The world keeps its own copy
+    # of the list, but it is rewritten from this on every start anyway.
+    allow_list_users=""
   fi
 
   # TICK DISTANCE ==========
