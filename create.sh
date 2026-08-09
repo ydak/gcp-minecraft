@@ -316,6 +316,12 @@ fi
 startup_script=$(mktemp)
 trap 'rm -f "$startup_script"' EXIT
 
+# VIEW_DISTANCE is set to 10 against a default of 32. Chunk data is the bulk of
+# what the server sends, so the default reaches much further than a 1GB RAM
+# shared-core instance can comfortably serve, in memory, CPU and outbound
+# traffic alike. Clients still render past this: client-side-chunk-generation is
+# on by default, so distant terrain is generated locally rather than sent.
+#
 # This runs on every boot, so it is written to be idempotent and to refresh
 # what it can. A reboot is the single update mechanism for the whole stack:
 #   - Container-Optimized OS applies whatever it staged onto its spare partition
@@ -343,7 +349,7 @@ if docker pull itzg/minecraft-bedrock-server:latest; then
 fi
 
 if ! docker inspect mc-server > /dev/null 2>&1; then
-  docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=${server_name:-ydak} -e GAMEMODE=${game_mode:-survival} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e ALLOW_LIST=false -e MAX_PLAYERS=${max_players:-2} -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e LEVEL_SEED=$seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
+  docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=${server_name:-ydak} -e GAMEMODE=${game_mode:-survival} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e ALLOW_LIST=false -e MAX_PLAYERS=${max_players:-2} -e VIEW_DISTANCE=10 -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e LEVEL_SEED=$seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
 fi
 EOS
 
@@ -440,6 +446,7 @@ if wait_for_server "$external_ip" 900 "$ping_info"; then
  参加者の権限 : ${permission:-member}
  最大人数     : ${max_players:-2}
  シード値     : ${seed:-(ランダム)}
+ 描画距離     : 10 チャンク (既定の 32 から下げています)
 
 --------------------------------------------------------------------
  管理情報   ※ 自分用。共有する必要はありません
