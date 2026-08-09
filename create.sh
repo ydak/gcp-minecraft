@@ -38,6 +38,44 @@ echo -n "よろしいですか? [y/N]: "
 read -r gcp_info
 if [ "$gcp_info" != "y" ]; then exit 1 ; fi
 
+# EXISTING SERVER ==========
+# Checked before any of the questions below. Creating a second instance fails at
+# the very end otherwise, after every setting has been typed in, and the free
+# tier only covers one instance anyway.
+existing=$(gcloud compute instances describe minecraft --zone=us-west1-b \
+  --format="value(status,networkInterfaces[0].accessConfigs[0].natIP)" 2>/dev/null || true)
+
+if [ -n "$existing" ]; then
+  existing_status=$(echo "$existing" | cut -f1)
+  existing_ip=$(echo "$existing" | cut -f2)
+
+  case "$existing_status" in
+    RUNNING) existing_status="起動中" ;;
+    TERMINATED | STOPPED) existing_status="停止中" ;;
+  esac
+
+  cat <<EOS
+
+[ERROR] すでにマインクラフトサーバーが存在します。
+        (A Minecraft server already exists in this project.)
+
+ プロジェクト : $project_id
+ 状態         : $existing_status
+ IP アドレス  : ${existing_ip:-(停止中のため割り当てなし)}
+
+無料枠で動かせるサーバーは 1 台までのため、作成を中止しました。
+
+ 遊ぶ       : 上記の IP アドレスとポート 19132 で接続してください
+ 更新する   : メニューから update を選んでください
+ 作り直す   : メニューから delete を選んでから、もう一度 create してください
+
+作り直すとワールドのデータも消えます。残したい場合は、先にメニューから
+backup を実行してください。
+
+EOS
+  exit 1
+fi
+
 # SERVER NAME ==========
 cat <<EOS
 
