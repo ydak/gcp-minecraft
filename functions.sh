@@ -15,6 +15,10 @@
 # Every setting carries a default here, so create.sh can leave the advanced ones
 # alone and config.sh can still change them later without the two drifting.
 #
+# The defaults are Minecraft's own except for two, which are set for the free
+# tier: VIEW_DISTANCE (32 -> 10) and PLAYER_IDLE_TIMEOUT (30 -> 5). Both bound
+# outbound traffic, which is what the 1 GB monthly allowance runs out of first.
+#
 # Arguments:
 #   1: Path to write to
 # Returns:
@@ -61,7 +65,7 @@ if docker pull itzg/minecraft-bedrock-server:latest; then
 fi
 
 if ! docker inspect mc-server > /dev/null 2>&1; then
-  docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=$q_server_name -e GAMEMODE=${game_mode:-survival} -e FORCE_GAMEMODE=${force_gamemode:-false} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e ALLOW_LIST=${allow_list:-false} -e ALLOW_LIST_USERS=$q_allow_list_users -e MAX_PLAYERS=${max_players:-2} -e VIEW_DISTANCE=${view_distance:-10} -e TICK_DISTANCE=${tick_distance:-4} -e PLAYER_IDLE_TIMEOUT=${player_idle_timeout:-30} -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e CHAT_RESTRICTION=${chat_restriction:-None} -e DISABLE_PLAYER_INTERACTION=${disable_player_interaction:-false} -e TEXTUREPACK_REQUIRED=${texturepack_required:-false} -e DISABLE_CUSTOM_SKINS=${disable_custom_skins:-false} -e LEVEL_SEED=$q_seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
+  docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=$q_server_name -e GAMEMODE=${game_mode:-survival} -e FORCE_GAMEMODE=${force_gamemode:-false} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e ALLOW_LIST=${allow_list:-false} -e ALLOW_LIST_USERS=$q_allow_list_users -e MAX_PLAYERS=${max_players:-2} -e VIEW_DISTANCE=${view_distance:-10} -e TICK_DISTANCE=${tick_distance:-4} -e PLAYER_IDLE_TIMEOUT=${player_idle_timeout:-5} -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e CHAT_RESTRICTION=${chat_restriction:-None} -e DISABLE_PLAYER_INTERACTION=${disable_player_interaction:-false} -e TEXTUREPACK_REQUIRED=${texturepack_required:-false} -e DISABLE_CUSTOM_SKINS=${disable_custom_skins:-false} -e LEVEL_SEED=$q_seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
 fi
 EOS
 }

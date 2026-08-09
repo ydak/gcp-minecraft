@@ -107,6 +107,9 @@ rm -f "$env_out"
 force_gamemode=${force_gamemode:-false}
 allow_list=${allow_list:-false}
 tick_distance=${tick_distance:-4}
+# 30 rather than the 5 a new server is built with: a server without this
+# variable is running Minecraft's own default, and this listing has to show what
+# is actually in force.
 player_idle_timeout=${player_idle_timeout:-30}
 chat_restriction=${chat_restriction:-None}
 disable_player_interaction=${disable_player_interaction:-false}
