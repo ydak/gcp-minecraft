@@ -316,11 +316,14 @@ fi
 startup_script=$(mktemp)
 trap 'rm -f "$startup_script"' EXIT
 
-# VIEW_DISTANCE is set to 10 against a default of 32. Chunk data is the bulk of
-# what the server sends, so the default reaches much further than a 1GB RAM
-# shared-core instance can comfortably serve, in memory, CPU and outbound
-# traffic alike. Clients still render past this: client-side-chunk-generation is
-# on by default, so distant terrain is generated locally rather than sent.
+# VIEW_DISTANCE is set to 5 against a default of 32. Chunk data is the bulk of
+# what the server sends and it grows with the square of the radius, so this is
+# the largest single lever on outbound traffic, and the default reaches much
+# further than a 1GB RAM shared-core instance can comfortably serve in memory,
+# CPU and traffic alike. Clients still render past this:
+# client-side-chunk-generation is on by default, so distant terrain is
+# generated locally rather than sent. Raise it from config when the view
+# matters more than the allowance.
 #
 # This runs on every boot, so it is written to be idempotent and to refresh
 # what it can. A reboot is the single update mechanism for the whole stack:
@@ -431,7 +434,11 @@ if wait_for_server "$external_ip" 900 "$ping_info"; then
  参加者の権限 : ${permission:-member}
  最大人数     : ${max_players:-2}
  シード値     : ${seed:-(ランダム)}
- 描画距離     : 10 チャンク (既定の 32 から下げています)
+ 描画距離     : 5 チャンク (既定の 32 から下げています)
+ 放置切断     : 5 分 (既定の 30 分から下げています)
+
+ ※ 描画距離と放置切断は、無料枠の通信量 1GB/月 に収めるための
+    設定です。config から変更できます。
 
 --------------------------------------------------------------------
  管理情報   ※ 自分用。共有する必要はありません

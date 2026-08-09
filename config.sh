@@ -115,7 +115,10 @@ chat_restriction=${chat_restriction:-None}
 disable_player_interaction=${disable_player_interaction:-false}
 texturepack_required=${texturepack_required:-false}
 disable_custom_skins=${disable_custom_skins:-false}
-view_distance=${view_distance:-10}
+# 32, Minecraft's own default, for the same reason as the idle timeout above: a
+# server without this variable is running that value, whatever a new server
+# would be built with.
+view_distance=${view_distance:-32}
 
 if [ -z "$server_name" ]; then
   echo " 失敗"
@@ -279,8 +282,9 @@ cat <<EOS
 
 -*-*-*-*- [VIEW DISTANCE (描画距離。単位はチャンク)] -*-*-*-*-
 大きくすると遠くまで見えますが、通信量とメモリを多く使います。
-Minecraft の既定は 32 ですが、無料枠では 10 前後が現実的です。
-指定できるのは 5 以上です。
+見える範囲の広さの二乗で効くため、通信量への影響が最も大きい設定です。
+Minecraft の既定は 32 ですが、作成時は通信量を抑えるため 5 にしています。
+景色を広く見たい場合は上げてください。指定できるのは 5 以上です。
 EOS
 echo -n "View distance (Default: ${view_distance}): "
 read -r input

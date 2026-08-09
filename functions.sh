@@ -16,8 +16,16 @@
 # alone and config.sh can still change them later without the two drifting.
 #
 # The defaults are Minecraft's own except for two, which are set for the free
-# tier: VIEW_DISTANCE (32 -> 10) and PLAYER_IDLE_TIMEOUT (30 -> 5). Both bound
+# tier: VIEW_DISTANCE (32 -> 5) and PLAYER_IDLE_TIMEOUT (30 -> 5). Both bound
 # outbound traffic, which is what the 1 GB monthly allowance runs out of first.
+#
+# Those two are the only ones left to set. Everything else that moves traffic
+# already ships at its cheapest value: TICK_DISTANCE is at the bottom of its
+# 4-12 range, CLIENT_SIDE_CHUNK_GENERATION_ENABLED already hands terrain
+# generation to the client, COMPRESSION_THRESHOLD of 1 already compresses
+# everything, COMPRESSION_ALGORITHM is zlib rather than the weaker-compressing
+# snappy, and EMIT_SERVER_TELEMETRY is off. None are set here, so that they
+# follow Minecraft rather than freezing today's value.
 #
 # Arguments:
 #   1: Path to write to
@@ -65,7 +73,7 @@ if docker pull itzg/minecraft-bedrock-server:latest; then
 fi
 
 if ! docker inspect mc-server > /dev/null 2>&1; then
-  docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=$q_server_name -e GAMEMODE=${game_mode:-survival} -e FORCE_GAMEMODE=${force_gamemode:-false} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e ALLOW_LIST=${allow_list:-false} -e ALLOW_LIST_USERS=$q_allow_list_users -e MAX_PLAYERS=${max_players:-2} -e VIEW_DISTANCE=${view_distance:-10} -e TICK_DISTANCE=${tick_distance:-4} -e PLAYER_IDLE_TIMEOUT=${player_idle_timeout:-5} -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e CHAT_RESTRICTION=${chat_restriction:-None} -e DISABLE_PLAYER_INTERACTION=${disable_player_interaction:-false} -e TEXTUREPACK_REQUIRED=${texturepack_required:-false} -e DISABLE_CUSTOM_SKINS=${disable_custom_skins:-false} -e LEVEL_SEED=$q_seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
+  docker run -d -it --name mc-server --restart=always -e EULA=TRUE -e SERVER_NAME=$q_server_name -e GAMEMODE=${game_mode:-survival} -e FORCE_GAMEMODE=${force_gamemode:-false} -e DIFFICULTY=${difficulty:-normal} -e ALLOW_CHEATS=${allow_cheat:-false} -e ALLOW_LIST=${allow_list:-false} -e ALLOW_LIST_USERS=$q_allow_list_users -e MAX_PLAYERS=${max_players:-2} -e VIEW_DISTANCE=${view_distance:-5} -e TICK_DISTANCE=${tick_distance:-4} -e PLAYER_IDLE_TIMEOUT=${player_idle_timeout:-5} -e DEFAULT_PLAYER_PERMISSION_LEVEL=${permission:-member} -e CHAT_RESTRICTION=${chat_restriction:-None} -e DISABLE_PLAYER_INTERACTION=${disable_player_interaction:-false} -e TEXTUREPACK_REQUIRED=${texturepack_required:-false} -e DISABLE_CUSTOM_SKINS=${disable_custom_skins:-false} -e LEVEL_SEED=$q_seed -p 19132:19132/udp -v mc-volume:/data itzg/minecraft-bedrock-server:latest
 fi
 EOS
 }
