@@ -109,6 +109,125 @@ echo -n "よろしいですか? [y/N]: "
 read -r gcp_info
 if [ "$gcp_info" != "y" ]; then exit 1 ; fi
 
+# BUDGET ==========
+# Set up before anything is built, so the alarm is already in place by the time
+# there is something that could cost money.
+#
+# The free tier has no hard stop: exceeding it bills rather than refuses, and
+# the outbound transfer allowance is only 1GB a month. A budget is the only
+# thing that says so before the invoice does.
+#
+# It only notifies. Nothing here stops a charge from happening.
+budget_name=minecraft-budget
+
+echo -n "  請求先を確認中 "
+billing_out=$(mktemp)
+billing_log=$(mktemp)
+(
+  set -e
+  # Comes back as billingAccounts/XXXXXX-XXXXXX-XXXXXX, but the flag below wants
+  # the bare id.
+  account=$(gcloud billing projects describe "$project_id" \
+    --format='value(billingAccountName)')
+  printf 'billing_account=%q\n' "${account#billingAccounts/}"
+  # Budgets are denominated in the billing account's own currency, and the
+  # amount has to carry it.
+  printf 'billing_currency=%q\n' \
+    "$(gcloud billing accounts describe "$account" --format='value(currencyCode)')"
+) > "$billing_out" 2> "$billing_log" &
+wait_with_dots $! || true
+
+billing_account=""
+billing_currency=""
+# shellcheck disable=SC1090
+. "$billing_out"
+rm -f "$billing_out"
+
+if [ -z "$billing_account" ] || [ -z "$billing_currency" ]; then
+  echo " 失敗"
+  cat <<EOS
+
+[WARN] 請求先アカウントを取得できませんでした。予算アラートは設定しません。
+       処理は続行します。下記から手動で設定できます。
+
+  https://console.cloud.google.com/billing/budgets
+
+EOS
+  rm -f "$billing_log"
+else
+  echo " 完了"
+  rm -f "$billing_log"
+
+  echo -n "  予算アラートを確認中 "
+  budget_out=$(mktemp)
+  budget_log=$(mktemp)
+  (
+    set -e
+    gcloud services enable billingbudgets.googleapis.com
+
+    # Re-running create must not stack up duplicates.
+    found=$(gcloud billing budgets list --billing-account="$billing_account" \
+      --filter="displayName=${budget_name}" --format='value(name)' 2> /dev/null || true)
+
+    if [ -z "$found" ]; then
+      # One unit of the account's currency. This setup is meant to cost nothing
+      # at all, so the alert should fire on the first charge rather than at some
+      # tolerance above zero.
+      gcloud billing budgets create --billing-account="$billing_account" \
+        --display-name="$budget_name" \
+        --budget-amount="1${billing_currency}" \
+        --threshold-rule=percent=1.0
+      echo "created"
+    fi
+  ) > "$budget_out" 2> "$budget_log" &
+  budget_status=0
+  wait_with_dots $! || budget_status=$?
+
+  if [ "$budget_status" -eq 0 ]; then
+    echo " 完了"
+
+    # The budget carries no recipient list of its own: the mail goes to whoever
+    # holds Billing Account Administrator or Billing Account User, so who that
+    # is has to be read back from IAM rather than printed from what was set.
+    #
+    # Reading the policy needs its own permission, which creating a budget does
+    # not imply, so an empty answer here is normal and just means saying less.
+    recipients=$(gcloud billing accounts get-iam-policy "$billing_account" \
+      --flatten='bindings[].members' \
+      --format='value(bindings.role,bindings.members)' 2> /dev/null \
+      | grep -E 'roles/billing\.(admin|user)' \
+      | grep -oE 'user:[^[:space:]]+' | sed 's/^user://' | sort -u)
+
+    echo "  1 ${billing_currency} を超えた時点で、下記にメールが届きます"
+    if [ -n "$recipients" ]; then
+      while IFS= read -r addr; do
+        echo "    $addr"
+      done <<< "$recipients"
+    else
+      echo "    請求先アカウントの管理者と利用者"
+    fi
+  else
+    # Not fatal. Creating the server is what was asked for, and failing to arm a
+    # notification is not a reason to refuse to do it. Budgets also need a role
+    # on the billing account that the project owner does not necessarily hold.
+    echo " 失敗"
+    cat <<EOS
+
+[WARN] 予算アラートを作成できませんでした。処理は続行します。
+       請求先アカウントの権限が不足している可能性があります。
+       下記から手動で設定できます。
+
+  https://console.cloud.google.com/billing/budgets
+
+--------------------------------------------------------------------
+$(cat "$budget_log")
+--------------------------------------------------------------------
+
+EOS
+  fi
+  rm -f "$budget_out" "$budget_log"
+fi
+
 # SERVER NAME ==========
 cat <<EOS
 
