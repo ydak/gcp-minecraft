@@ -185,8 +185,26 @@ else
 
   if [ "$budget_status" -eq 0 ]; then
     echo " 完了"
-    if grep -q created "$budget_out"; then
-      echo "  1 ${billing_currency} を超えた時点で、請求先の管理者にメールが届きます"
+
+    # The budget carries no recipient list of its own: the mail goes to whoever
+    # holds Billing Account Administrator or Billing Account User, so who that
+    # is has to be read back from IAM rather than printed from what was set.
+    #
+    # Reading the policy needs its own permission, which creating a budget does
+    # not imply, so an empty answer here is normal and just means saying less.
+    recipients=$(gcloud billing accounts get-iam-policy "$billing_account" \
+      --flatten='bindings[].members' \
+      --format='value(bindings.role,bindings.members)' 2> /dev/null \
+      | grep -E 'roles/billing\.(admin|user)' \
+      | grep -oE 'user:[^[:space:]]+' | sed 's/^user://' | sort -u)
+
+    echo "  1 ${billing_currency} を超えた時点で、下記にメールが届きます"
+    if [ -n "$recipients" ]; then
+      while IFS= read -r addr; do
+        echo "    $addr"
+      done <<< "$recipients"
+    else
+      echo "    請求先アカウントの管理者と利用者"
     fi
   else
     # Not fatal. Creating the server is what was asked for, and failing to arm a
